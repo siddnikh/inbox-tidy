@@ -45,7 +45,10 @@ Every `/api` request must (1) target exactly `127.0.0.1:<port>` or `localhost:<p
 | Yahoo | imap.mail.yahoo.com:993 TLS | smtp.mail.yahoo.com:465 TLS | https://login.yahoo.com/account/security → Generate app password |
 | Rediffmail Pro | imap.rediffmailpro.com:993 TLS | smtp.rediffmailpro.com:465 TLS | The Pro admin must enable IMAP sync. Free @rediffmail.com accounts appear to offer only POP3, which is not supported. |
 
-- Only `INBOX` is scanned, over the lookback window (`SINCE`, 12 months by default). Gmail's `INBOX` includes all category tabs.
+- Only `INBOX` is scanned, opened read-only, over the lookback window (`SINCE`, 12 months by default). Gmail's `INBOX` includes all category tabs.
+- The scanner (`src/core/mail/scanner.ts`) keeps one scan per `AppContext` in a module-level `WeakMap`. It fetches envelope, flags, internal date, and only the `List-Unsubscribe` and `List-Unsubscribe-Post` headers, in UID batches of 500, then refreshes `\Seen` with flags-only fetches in batches of 2,000. imapflow returns the requested headers as a raw Buffer; `src/core/mail/headers.ts` unfolds it and decodes RFC 2047 words.
+- Migration 2 adds `senders.display_name_at` and `senders.unsubscribe_at`, the `received_at` of the message each value came from, so the newest message wins regardless of scan order.
+- IMAP errors are classified in `src/core/mail/errors.ts` by imapflow's `authenticationFailed` and `serverResponseCode`, and by Node socket codes such as `ENOTFOUND` and `ECONNREFUSED`.
 - Trash means `MOVE` to the special-use `\Trash` mailbox, found by special-use flag rather than name (`[Gmail]/Trash`, `Deleted Messages`, `Trash`), falling back to a mailbox named `Trash`. On Gmail, deleting without moving only removes a label, so always move.
 - Plain-text IMAP/SMTP and `http:` unsubscribe URLs are allowed only for `127.0.0.1` and `localhost`, which is the GreenMail QA server.
 
