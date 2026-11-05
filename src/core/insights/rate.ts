@@ -14,9 +14,13 @@ export function monthsSpanned(
   return Math.min(Math.max(days / MONTH_DAYS, 1), lookbackMonths);
 }
 
+export function windowStart(lookbackMonths: number, now = Date.now()): string {
+  return new Date(now - lookbackMonths * MONTH_DAYS * DAY_MS).toISOString();
+}
+
 export function emailsPerMonth(ctx: AppContext, senderId: number, now = Date.now()): number {
   const { lookbackMonths } = ctx.settings();
-  const since = new Date(now - lookbackMonths * MONTH_DAYS * DAY_MS).toISOString();
+  const since = windowStart(lookbackMonths, now);
   const row = ctx.db
     .query<{ total: number; first: string | null }, [number, string]>(
       `SELECT COUNT(*) AS total, MIN(received_at) AS first FROM messages

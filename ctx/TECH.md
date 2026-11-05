@@ -29,6 +29,7 @@ Every `/api` request must (1) target exactly `127.0.0.1:<port>` or `localhost:<p
 - Codex runs as `codex exec --sandbox read-only --skip-git-repo-check --ephemeral --color never -o <file> [--output-schema <file>] -`, with the prompt on stdin.
 - Each call runs in a fresh temporary directory, so no project instructions leak in. `ANTHROPIC_API_KEY` and parent Claude Code session variables are stripped, so the subscription is used.
 - Finder-launched apps get a minimal `PATH`. `src/core/ai/shell-path.ts` asks the user's interactive login shell (`$SHELL -ilc`) for its `PATH`, which is how nvm-installed `codex` (needing `node`) and `~/.local/bin/claude` are found.
+- A JSON schema passed to `ask` must suit both CLIs, so it follows OpenAI strict structured outputs, which Codex enforces. The top level is an object. Every object sets `additionalProperties: false` and lists all of its properties in `required`. Keywords such as `maxLength` and `format` are not used, so length limits are applied in code after validation. The sender-sorting schema is `SORT_SCHEMA` in `src/core/insights/sort.ts`.
 - Tests inject a fake `AiClient`; they must never spawn the real CLIs.
 - Moving to paid APIs later means adding another `AiClient` implementation. Nothing else changes.
 
