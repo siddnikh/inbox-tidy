@@ -92,6 +92,10 @@ export const migrations: Migration[] = [
     `,
   },
   { version: 2, name: "mail-sync", sql: "" },
-  { version: 3, name: "insights", sql: "" },
+  {
+    version: 3,
+    name: "insights",
+    sql: "CREATE INDEX messages_sender_stats ON messages(sender_id, received_at, trashed_at, is_read);",
+  },
   { version: 4, name: "actions", sql: "" },
 ];
