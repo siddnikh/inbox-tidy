@@ -1,3 +1,5 @@
+export {};
+
 const [host = "127.0.0.1", ...ports] = process.argv.slice(2);
 const deadline = Date.now() + 60_000;
 
