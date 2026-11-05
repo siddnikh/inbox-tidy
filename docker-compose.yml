@@ -6,7 +6,6 @@ services:
       GREENMAIL_OPTS: >-
         -Dgreenmail.setup.test.all
         -Dgreenmail.hostname=0.0.0.0
-        -Dgreenmail.auth.disabled=false
         -Dgreenmail.users=qa:qa-password@inbox-tidy.test,friend:friend-password@inbox-tidy.test
         -Dgreenmail.users.login=email
         -Dgreenmail.verbose=false
