@@ -1,0 +1,28 @@
+{
+  "name": "inbox-tidy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun scripts/dev.ts",
+    "start": "bun src/core/main.ts",
+    "test": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "build": "bun scripts/build-app.ts",
+    "install-app": "bun scripts/install-app.ts"
+  },
+  "dependencies": {
+    "imapflow": "^2.10.2",
+    "nodemailer": "^10.3.1",
+    "preact": "^11.1.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.5",
+    "@types/bun": "^1.4.4",
+    "@types/nodemailer": "^8.0.2",
+    "typescript": "^7.0.2"
+  }
+}

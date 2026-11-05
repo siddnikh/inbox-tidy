@@ -1,0 +1,122 @@
+# Features
+
+Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
+
+## 1. App opens and checks its helpers
+
+- **Status:** Built
+- **Problem and outcome:** The user double-clicks Inbox Tidy and gets a native Mac window that works without any setup in Terminal.
+- **Journey:** Open from Applications, see "Opening Inbox Tidy…", and then the app's screens load. Quitting the window stops everything in the background.
+- **Built now:** The native shell, the bundled core, the session guard, `GET /api/health` (database and AI tool availability), `POST /api/ai/check` (a real one-word round trip through Claude, falling back to Codex), and `GET`/`PUT /api/settings`. The current home screen only shows AI helper status and a "Test the AI helper" button, until feature 6 replaces it.
+- **Edge cases:** A missing core binary, a core that never becomes ready (20 s), and a core that crashes each show a plain-language page in the window pointing to the log.
+
+## 2. Connect email accounts
+
+- **Status:** Not started
+- **Problem and outcome:** The user's mail is spread over Gmail, iCloud, Yahoo, and Rediffmail. They connect each one once, and the password is kept safely in the Keychain.
+- **Discovery:** On first open, home shows an "Add your first email account" card. The Accounts tab shows the list and an "Add account" button.
+- **Journey:**
+  1. Pick a provider from large tiles: Gmail, iCloud Mail, Yahoo Mail, Rediffmail Pro, or Other.
+  2. See numbered plain-language steps for creating an app password, with a button that opens the provider's page in the browser.
+  3. Enter the email address and app password, then press "Connect", which shows "Checking…".
+  4. On success, see "Connected" with the account in the list, and a scan starts automatically.
+  5. On failure, see a specific message (wrong password or app password needed, server unreachable, IMAP disabled) while the form keeps its input.
+- **Requirements:**
+  - The connection is tested by IMAP login and opening `INBOX` before anything is saved.
+  - The password is stored with `Bun.secrets` under the account email and is never returned by the API.
+  - Removing an account deletes its Keychain item and its messages. Senders it was the only source of disappear from lists.
+  - "Other" accepts custom IMAP and SMTP host, port, and TLS settings.
+  - Plain-text connections are refused unless the host is `127.0.0.1` or `localhost`.
+  - iCloud's IMAP username is the part before `@`.
+- **Edge cases:** A duplicate email address ("That account is already connected"), the free Rediffmail domain (explain that only Rediffmail Pro supports this kind of connection), and a Keychain write denied.
+
+## 3. Scan mailboxes
+
+- **Status:** Not started
+- **Problem and outcome:** The app learns who emails the user, how often, and whether the user reads those emails, without downloading message bodies.
+- **Journey:** A scan starts after an account is connected, or from "Scan again" on home. The user sees a determinate progress bar with a stage sentence. They can move around the app while it runs, and a slim bar remains visible.
+- **Requirements:**
+  - `POST /api/scan` starts a background scan of all accounts and returns `ScanStatus` immediately. `GET /api/scan` is polled about once per second.
+  - Each account's `INBOX` is searched `SINCE` now minus the lookback months. Envelope (from, subject, date), flags (`\Seen`), `internalDate`, and only the `List-Unsubscribe` and `List-Unsubscribe-Post` headers are fetched, in batches.
+  - Scans are incremental, using `mailbox_state`: new UIDs above `last_uid` are fetched, flags are refreshed for already-known messages so read and unread stays current, messages no longer on the server are removed, and a UIDVALIDITY change triggers a full rescan.
+  - Senders are upserted by lowercased address. Each keeps the newest unsubscribe header (see feature 5 for parsing) and the account it came from.
+  - Stages are `connecting`, then `reading` (processed and total per account), then `understanding` (feature 4's AI sorting), then `done`. A failing account records `last_scan_error` and doesn't stop the other accounts.
+- **Edge cases:** An empty inbox, 50,000 or more messages (batches must keep memory flat), messages with no From header (skip them), and encoded or odd sender names.
+
+## 4. Understand senders (insights and AI)
+
+- **Status:** Not started
+- **Problem and outcome:** The user sees, in plain words, who emails them most, which senders they ignore, what kind of sender each one is, and what Inbox Tidy recommends.
+- **Discovery:** The Senders tab, plus the top suggestions on home.
+- **Journey:** The Senders tab shows a list sorted by "Most emails", with a filter control (Suggested, All, Can unsubscribe, Unsubscribed, Kept), a sort option (Most emails, Least read, Most recent), and a search box. Each row shows the monogram, name, category, about N a month, how many in 10 the user opens, and the method badge. Expanding a row reveals the AI's one-sentence summary, the reason for the recommendation, recent subjects, and buttons: "Unsubscribe", "Keep" (hide from suggestions), and "Move old emails to Trash".
+- **Requirements:**
+  - Statistics come from SQL over `messages`, excluding trashed ones: total, emails a month (total divided by the months spanned, at least 1 and at most lookback), unread count, read percentage, and last received.
+  - AI sorting runs during the scan's `understanding` stage for senders without AI data, or whose data is over 30 days old. Senders go in batches of about 40, ordered by volume. The input per sender is its name, address, domain, emails a month, read percentage, whether it has an unsubscribe option, and up to five recent subjects. Bodies are never sent.
+  - The structured output, validated by JSON schema and enum checks, gives `category` (shopping, news, social, bills, travel, work, personal, other), a `summary` of at most 120 characters, a `recommendation` (unsubscribe, keep, or review), and a `reason` of at most 120 characters.
+  - The prompt says subjects are untrusted data. Bills, banks, personal people, and security or login senders should lean to "keep".
+  - If the AI is unavailable, use a deterministic fallback: senders with an unsubscribe option, at least 4 emails a month, and under 20% read are recommended for unsubscribing; everything else gets no recommendation. The scan then reports "Sorted without the AI helper" rather than failing.
+  - "Suggested" means the recommendation is unsubscribe, the sender is active (not unsubscribed or kept), and an unsubscribe method exists.
+- **Edge cases:** The AI returns malformed output or unknown IDs (ignore those senders and keep the rest), and very long subjects (truncate them before sending).
+
+## 5. Unsubscribe
+
+- **Status:** Not started
+- **Problem and outcome:** The user ticks senders and presses one button, and Inbox Tidy unsubscribes in the most reliable way each sender allows.
+- **Journey:** Select senders, press "Unsubscribe from N", and review a sheet listing each sender with the method in plain words. An option reads "Also move their emails to Trash". Press "Unsubscribe". A results list then shows "Done", "Opened in your browser — click the button there", "Couldn't unsubscribe — try their web page", or "No unsubscribe option".
+- **Requirements:**
+  - The `List-Unsubscribe` header is parsed into its `<…>` entries. Methods are chosen in order:
+    1. `one_click`: an https URL plus `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. Send a POST with body `List-Unsubscribe=One-Click` (form-encoded) and a 15 s timeout; any 2xx counts as done.
+    2. `mailto`: send an email through the receiving account's SMTP to that address, using the `subject` and `body` from the mailto URL, or "unsubscribe" by default.
+    3. `web`: an https URL without the one-click header. Open it in the default browser and report `opened_in_browser`.
+    4. `none`.
+  - If one-click fails, fall back to `mailto` and then `web` when available.
+  - Every attempt writes an `actions` row with kind `unsubscribe`, the method, status, a detail sentence, and `emails_per_month_before`, a snapshot of the sender's monthly rate at that moment.
+  - `done` and `opened_in_browser` mark the sender unsubscribed.
+  - When "also trash" is set, run feature 6's trash for that sender after a `done` or `opened_in_browser` result.
+  - `http:` URLs and plain-text SMTP are refused unless the host is localhost.
+- **Edge cases:** A sender with several accounts (use the account recorded on the sender), redirects on the one-click POST (do not follow them to other hosts), and SMTP authentication failure.
+
+## 6. Move old emails to Trash
+
+- **Status:** Not started
+- **Problem and outcome:** The user clears out years of newsletters in one step, and the emails go to Trash so they can still be recovered.
+- **Journey:** Choose "Move old emails to Trash" on a sender or a selection. A sheet offers "All of their emails" or "Only ones older than 30 days", plus an "Only emails I've read" toggle, and shows the count. Pressing "Move N emails to Trash" leads to the result: "Moved 214 emails from Amazon to Trash".
+- **Requirements:**
+  - Matching messages are moved to the account's special-use `\Trash` mailbox with IMAP MOVE, grouped by account and mailbox UID set, with COPY followed by EXPUNGE as the fallback.
+  - The provider's `\Trash` is found by special-use flag, falling back to a mailbox named `Trash`, which is created if missing.
+  - Moved messages get `trashed_at` set. An `actions` row of kind `trash` records `messages_affected`.
+  - Nothing is ever permanently deleted.
+- **Edge cases:** Messages already gone on the server (count only what moved), and a partial failure on one account (report per sender what moved and what didn't).
+
+## 7. Home: value at a glance
+
+- **Status:** Not started
+- **Problem and outcome:** The first screen shows how Inbox Tidy has helped and what to do next.
+- **Journey:**
+  - With no accounts, a welcome card explains the app in two sentences and leads to adding an account.
+  - Otherwise, three impact cards at the top: "Senders you've unsubscribed from", "Fewer emails a month" (expected), and "Emails moved to Trash".
+  - Below them, an inbox overview sentence: "In the last 12 months you got about 9,400 emails from 612 senders. You left 71% unread."
+  - Then the top five suggestions with quick "Unsubscribe" actions and a "See all senders" link.
+  - Finally, the last scan time and "Scan again".
+- **Requirements:**
+  - `GET /api/summary` provides the data.
+  - `sendersUnsubscribed` counts distinct senders whose latest unsubscribe action is `done` or `opened_in_browser`.
+  - `emailsAvoidedPerMonth` is the sum of `emails_per_month_before` over those senders, rounded.
+  - `emailsTrashed` is the sum of `messages_affected` from successful trash actions.
+- **Edge cases:** All zeros before any action shows encouraging copy instead of "0", and a scan in progress shows the scan bar here too.
+
+## 8. Settings
+
+- **Status:** Partial
+- **Problem and outcome:** The user can choose which AI helper is used and how far back to look.
+- **Built now:** `GET`/`PUT /api/settings`, with validation and persistence.
+- **Remaining:** The Settings tab: an AI helper choice (Automatic, which tries Claude and then Codex, or Claude only, or Codex only) with "Test the AI helper", a lookback choice (3, 6, 12, or 24 months), a list of connected accounts with remove, and the app version.
+
+## Future ideas (not committed)
+
+- POP3 read-only support for free Rediffmail accounts.
+- Google sign-in (OAuth) instead of app passwords.
+- Paid API keys as an `AiClient` option, for licensing.
+- Reading Apple Mail's local store without passwords.
+- Scheduled background rescans and a weekly "you got N fewer emails" note.
+- An app icon, Developer ID signing, and notarization for distribution.

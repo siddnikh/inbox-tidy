@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.local/
+*.log
+.env
+.env.*
+.DS_Store
+coverage/
+*.sqlite
+*.sqlite-*
+qa-artifacts/
+screenshots/
