@@ -60,33 +60,43 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 ## 5. Unsubscribe
 
-- **Status:** Not started
+- **Status:** Partial
 - **Problem and outcome:** The user ticks senders and presses one button, and Inbox Tidy unsubscribes in the most reliable way each sender allows.
 - **Journey:** Select senders, press "Unsubscribe from N", and review a sheet listing each sender with the method in plain words. An option reads "Also move their emails to Trash". Press "Unsubscribe". A results list then shows "Done", "Opened in your browser — click the button there", "Couldn't unsubscribe — try their web page", or "No unsubscribe option".
+- **Built now:** `POST /api/actions/unsubscribe` (`src/core/actions/unsubscribe.ts`, `src/core/routes/actions.ts`), verified against GreenMail and local test endpoints.
+- **Remaining:** The selection sheet and the results list in the UI.
 - **Requirements:**
-  - The `List-Unsubscribe` header is parsed into its `<…>` entries. Methods are chosen in order:
-    1. `one_click`: an https URL plus `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. Send a POST with body `List-Unsubscribe=One-Click` (form-encoded) and a 15 s timeout; any 2xx counts as done.
-    2. `mailto`: send an email through the receiving account's SMTP to that address, using the `subject` and `body` from the mailto URL, or "unsubscribe" by default.
-    3. `web`: an https URL without the one-click header. Open it in the default browser and report `opened_in_browser`.
-    4. `none`.
-  - If one-click fails, fall back to `mailto` and then `web` when available.
-  - Every attempt writes an `actions` row with kind `unsubscribe`, the method, status, a detail sentence, and `emails_per_month_before`, a snapshot of the sender's monthly rate at that moment.
-  - `done` and `opened_in_browser` mark the sender unsubscribed.
-  - When "also trash" is set, run feature 6's trash for that sender after a `done` or `opened_in_browser` result.
+  - The request is `{senderIds, alsoTrash}`: 1 to 200 positive integer IDs (a duplicate is handled once) and a boolean. Results come back in request order. An unknown sender gets `not_available` with "That sender is no longer in your list." and no log row.
+  - Options come from the `List-Unsubscribe` and `List-Unsubscribe-Post` headers of the sender's newest non-trashed message that has them, or from the sender's stored target when no message does. The header is parsed into its `<…>` entries, which are tried in this order, falling back to the next on failure:
+    1. `one_click`: an https URL plus `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. Send a POST with body `List-Unsubscribe=One-Click` (form-encoded) and a 15 s timeout. Any 2xx counts as done. Redirects are never followed, so a 3xx counts as a failure.
+    2. `mailto`: send an email to that address through the SMTP of the account recorded on the sender (or else the account of the sender's newest message), using the `subject` and `body` from the mailto URL, or "unsubscribe" by default.
+    3. `web`: an https URL. Open it in the default browser and report `opened_in_browser`.
+    4. `none`: `not_available`.
+  - Up to four senders are handled at once. Browser pages open one at a time, and at most 10 per request; later ones fail with a message asking to try them in a smaller batch.
+  - Result messages: "Unsubscribed.", "Unsubscribed by sending them an email.", "Opened their unsubscribe page in your browser. Press the button there to finish.", "Couldn't unsubscribe automatically. Try again later.", and "This sender doesn't offer a way to unsubscribe. You can move their emails to Trash instead." Technical failure details go to the core log only.
+  - Every attempt writes one `actions` row with kind `unsubscribe`, the last method tried, the status, the result sentence, and `emails_per_month_before`, the sender's monthly rate taken before anything is trashed.
+  - `done` and `opened_in_browser` mark the sender unsubscribed, through that latest `unsubscribe` action.
+  - When `alsoTrash` is set, feature 6's trash runs for all of that sender's emails after a `done` or `opened_in_browser` result. `trashed` holds the count, and the message gains a sentence such as "Moved 214 emails to Trash."
   - `http:` URLs and plain-text SMTP are refused unless the host is localhost.
-- **Edge cases:** A sender with several accounts (use the account recorded on the sender), redirects on the one-click POST (do not follow them to other hosts), and SMTP authentication failure.
+- **Edge cases:** A sender with several accounts (the account recorded on the sender is used), redirects on the one-click POST (not followed), an endpoint that never answers (times out and falls back), and SMTP authentication failure (falls back to the web page).
 
 ## 6. Move old emails to Trash
 
-- **Status:** Not started
+- **Status:** Partial
 - **Problem and outcome:** The user clears out years of newsletters in one step, and the emails go to Trash so they can still be recovered.
 - **Journey:** Choose "Move old emails to Trash" on a sender or a selection. A sheet offers "All of their emails" or "Only ones older than 30 days", plus an "Only emails I've read" toggle, and shows the count. Pressing "Move N emails to Trash" leads to the result: "Moved 214 emails from Amazon to Trash".
+- **Built now:** `POST /api/actions/trash` and `trashSenderEmails` (`src/core/actions/trash.ts`), verified against GreenMail.
+- **Remaining:** The sheet and the result in the UI, including the count shown before moving.
 - **Requirements:**
-  - Matching messages are moved to the account's special-use `\Trash` mailbox with IMAP MOVE, grouped by account and mailbox UID set, with COPY followed by EXPUNGE as the fallback.
+  - The request is `{senderIds, olderThanDays, onlyRead}`: the same sender ID rules as feature 5, an integer from 0 (all emails) to 3650, and a boolean.
+  - The sender's matching non-trashed messages are grouped by account and mailbox. Each account gets one IMAP connection, and trash runs on the same account never overlap. Each mailbox's UIDVALIDITY must still match the stored one; if it doesn't, those emails are skipped and the user is asked to scan again.
+  - Matching messages are moved to the account's Trash with IMAP MOVE in chunks of 500 UIDs. imapflow falls back to COPY followed by EXPUNGE when the server lacks MOVE.
   - The provider's `\Trash` is found by special-use flag, falling back to a mailbox named `Trash`, which is created if missing.
-  - Moved messages get `trashed_at` set. An `actions` row of kind `trash` records `messages_affected`.
+  - Only messages that really moved get `trashed_at`: those in the server's UID map or, without one, those no longer in the source mailbox.
+  - One `actions` row of kind `trash` records `messages_affected`. Its status is `done` when anything moved or nothing needed moving, so the home screen counts partial moves, and `failed` otherwise.
+  - Result messages are "Moved 214 emails from Amazon to Trash.", "There were no emails from Amazon to move.", or a partial failure such as "Moved 120 emails from Amazon to Trash, but 94 couldn't be moved. Try again later." A partial or full failure has result status `failed`.
   - Nothing is ever permanently deleted.
-- **Edge cases:** Messages already gone on the server (count only what moved), and a partial failure on one account (report per sender what moved and what didn't).
+- **Edge cases:** Messages already gone on the server (only what moved is counted; the rest is left for the next scan), a mailbox whose UIDVALIDITY changed (skipped, with "Scan again, then try again."), and a failure on one account (the other accounts still move, and the message says what moved and what didn't).
 
 ## 7. Home: value at a glance
 
