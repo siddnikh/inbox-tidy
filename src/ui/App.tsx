@@ -1,76 +1,267 @@
-import { useEffect, useState } from "preact/hooks";
-import type { AiCheckResponse, HealthResponse } from "../shared/api.ts";
-import { type ApiError, api } from "./api.ts";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import type { AccountSummary, ScanStatus, SenderRow } from "../shared/api.ts";
+import { api } from "./api.ts";
+import { AppContext, type AppState, type Tab, type ToastTone } from "./app-state.ts";
+import { type ScanNotice, ScanProgress, ScanResultNotice } from "./components/ScanBar.tsx";
+import { SegmentedTabs } from "./components/Segmented.tsx";
+import { type ToastItem, Toasts } from "./components/Toasts.tsx";
+import { Accounts } from "./screens/Accounts.tsx";
+import { Home } from "./screens/Home.tsx";
+import { Senders } from "./screens/Senders.tsx";
+import { Settings } from "./screens/Settings.tsx";
+import { AddAccountSheet } from "./sheets/AddAccountSheet.tsx";
+import { TrashSheet } from "./sheets/TrashSheet.tsx";
+import { UnsubscribeSheet } from "./sheets/UnsubscribeSheet.tsx";
 
-type Load<T> =
-  | { state: "loading" }
-  | { state: "ready"; data: T }
-  | { state: "error"; message: string };
+const TABS: { value: Tab; label: string }[] = [
+  { value: "home", label: "Home" },
+  { value: "senders", label: "Senders" },
+  { value: "accounts", label: "Accounts" },
+  { value: "settings", label: "Settings" },
+];
+
+function tabFromHash(): Tab {
+  const hash = window.location.hash.slice(1);
+  return TABS.find((t) => t.value === hash)?.value ?? "home";
+}
+
+type OpenSheet =
+  | { kind: "add" }
+  | { kind: "unsubscribe" | "trash"; senders: SenderRow[]; onFinished?: () => void }
+  | null;
+
+const POLL_MS = 1000;
+const POLL_RETRY_MS = 2000;
+// A scan the UI just asked for may not be visible on the very first poll.
+const EXPECTED_SCAN_POLLS = 3;
+const CLOCK_SLACK_MS = 2000;
 
 export function App() {
-  const [health, setHealth] = useState<Load<HealthResponse>>({ state: "loading" });
-  const [check, setCheck] = useState<Load<AiCheckResponse> | null>(null);
+  const [tab, setTab] = useState<Tab>(tabFromHash);
+  const [version, setVersion] = useState(0);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [scan, setScan] = useState<ScanStatus | null>(null);
+  const [pollTrouble, setPollTrouble] = useState(false);
+  const [notice, setNotice] = useState<ScanNotice | null>(null);
+  const [retryingScan, setRetryingScan] = useState(false);
+  const [sheet, setSheet] = useState<OpenSheet>(null);
+  const toastId = useRef(1);
+  const header = useRef<HTMLElement>(null);
 
-  const loadHealth = () => {
-    setHealth({ state: "loading" });
-    api<HealthResponse>("/api/health")
-      .then((data) => setHealth({ state: "ready", data }))
-      .catch((e: ApiError) => setHealth({ state: "error", message: e.message }));
+  useEffect(() => {
+    const el = header.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      document.documentElement.style.setProperty("--header-height", `${el.offsetHeight}px`);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const onHash = () => setTab(tabFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const navigate = useCallback((next: Tab) => {
+    if (window.location.hash !== `#${next}`) window.location.hash = next;
+    setTab(next);
+    window.scrollTo(0, 0);
+  }, []);
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((list) => list.filter((t) => t.id !== id));
+  }, []);
+
+  const toast = useCallback(
+    (message: string, tone: ToastTone = "info") => {
+      const id = toastId.current++;
+      setToasts((list) => [...list.slice(-2), { id, message, tone }]);
+      setTimeout(() => dismissToast(id), tone === "error" ? 6000 : 3000);
+    },
+    [dismissToast],
+  );
+
+  // The poller lives in refs so timers never call a stale closure.
+  const scanner = useMemo(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let sawRunning = false;
+    let expected: { since: number; polls: number } | null = null;
+
+    const schedule = (ms: number) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(poll, ms);
+    };
+
+    const finish = (s: ScanStatus) => {
+      sawRunning = false;
+      expected = null;
+      refresh();
+      if (s.state === "failed") {
+        setNotice({ failed: true, message: s.message, errors: s.errors });
+        return;
+      }
+      toast(s.message || "Scan finished.", "success");
+      setNotice(s.errors.length ? { failed: false, message: s.message, errors: s.errors } : null);
+    };
+
+    const handle = (s: ScanStatus) => {
+      setScan(s);
+      setPollTrouble(false);
+      if (s.state === "running") {
+        sawRunning = true;
+        schedule(POLL_MS);
+        return;
+      }
+      const finishedAt = s.finishedAt ? Date.parse(s.finishedAt) : Number.NaN;
+      if (sawRunning || (expected && finishedAt >= expected.since)) {
+        finish(s);
+        return;
+      }
+      if (expected && expected.polls < EXPECTED_SCAN_POLLS) {
+        expected.polls++;
+        schedule(POLL_MS);
+        return;
+      }
+      expected = null;
+    };
+
+    async function poll() {
+      timer = null;
+      try {
+        handle(await api<ScanStatus>("/api/scan"));
+      } catch {
+        if (sawRunning || expected) {
+          setPollTrouble(true);
+          schedule(POLL_RETRY_MS);
+        }
+      }
+    }
+
+    return {
+      handle,
+      poll,
+      expect() {
+        expected = { since: Date.now() - CLOCK_SLACK_MS, polls: 0 };
+      },
+      stop() {
+        if (timer) clearTimeout(timer);
+      },
+    };
+  }, [refresh, toast]);
+
+  useEffect(() => {
+    scanner.poll();
+    return scanner.stop;
+  }, [scanner]);
+
+  const startScan = useCallback(async () => {
+    const status = await api<ScanStatus>("/api/scan", { method: "POST" });
+    setNotice(null);
+    scanner.expect();
+    scanner.handle(status);
+  }, [scanner]);
+
+  const watchScan = useCallback(() => {
+    scanner.expect();
+    scanner.poll();
+  }, [scanner]);
+
+  const state: AppState = {
+    version,
+    refresh,
+    toast,
+    scan,
+    startScan,
+    watchScan,
+    navigate,
+    openAddAccount: () => setSheet({ kind: "add" }),
+    openUnsubscribe: (senders, onFinished) =>
+      setSheet({ kind: "unsubscribe", senders, onFinished }),
+    openTrash: (senders, onFinished) => setSheet({ kind: "trash", senders, onFinished }),
   };
-  useEffect(loadHealth, []);
 
-  const runCheck = () => {
-    setCheck({ state: "loading" });
-    api<AiCheckResponse>("/api/ai/check", { method: "POST" })
-      .then((data) => setCheck({ state: "ready", data }))
-      .catch((e: ApiError) => setCheck({ state: "error", message: e.message }));
+  const onConnected = (account: AccountSummary) => {
+    setSheet(null);
+    toast(`Connected ${account.email}. Reading your emails now…`, "success");
+    refresh();
+    watchScan();
+  };
+
+  const retryScan = async () => {
+    setRetryingScan(true);
+    try {
+      await startScan();
+    } catch {
+      toast(
+        "Couldn't start the scan. Check the account on the Accounts tab and try again.",
+        "error",
+      );
+    } finally {
+      setRetryingScan(false);
+    }
   };
 
   return (
-    <main class="page">
-      <header class="page-header">
-        <h1 class="large-title">Inbox Tidy</h1>
-        <p class="secondary">See who fills your inbox, and quietly make it stop.</p>
-      </header>
-      <section class="card" aria-live="polite">
-        <h2 class="title">AI helper</h2>
-        {health.state === "loading" && (
-          <div class="skeleton-line" role="status" aria-label="Checking…" />
-        )}
-        {health.state === "error" && (
-          <div class="inline-error">
-            <p>{health.message}</p>
-            <button type="button" class="button" onClick={loadHealth}>
-              Try again
-            </button>
+    <AppContext.Provider value={state}>
+      <header class="app-header" ref={header}>
+        <p class="window-title">Inbox Tidy</p>
+        <nav class="tab-row">
+          <SegmentedTabs
+            options={TABS}
+            value={tab}
+            onChange={navigate}
+            label="Sections"
+            idPrefix="tab"
+          />
+        </nav>
+        {scan?.state === "running" && (
+          <div class="header-inner">
+            <ScanProgress scan={scan} trouble={pollTrouble} />
           </div>
         )}
-        {health.state === "ready" && (
-          <>
-            <ul class="plain-list">
-              {health.data.ai.providers.map((p) => (
-                <li key={p.id}>
-                  {p.label}: {p.available ? "installed" : "not found on this Mac"}
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              class="button button-primary"
-              disabled={check?.state === "loading"}
-              onClick={runCheck}
-            >
-              {check?.state === "loading" ? "Checking…" : "Test the AI helper"}
-            </button>
-            {check?.state === "ready" && (
-              <p class="success">
-                {check.data.label} answered in {(check.data.durationMs / 1000).toFixed(1)} seconds.
-              </p>
-            )}
-            {check?.state === "error" && <p class="danger">{check.message}</p>}
-          </>
-        )}
-      </section>
-    </main>
+      </header>
+      <main class="page">
+        <div class="stack" role="tabpanel" aria-labelledby={`tab-${tab}`}>
+          {notice && (
+            <ScanResultNotice
+              notice={notice}
+              onDismiss={() => setNotice(null)}
+              onOpenAccounts={() => {
+                setNotice(null);
+                navigate("accounts");
+              }}
+              onRetry={retryScan}
+              retrying={retryingScan}
+            />
+          )}
+          {tab === "home" && <Home />}
+          {tab === "senders" && <Senders />}
+          {tab === "accounts" && <Accounts />}
+          {tab === "settings" && <Settings />}
+        </div>
+      </main>
+      {sheet?.kind === "add" && (
+        <AddAccountSheet onClose={() => setSheet(null)} onConnected={onConnected} />
+      )}
+      {sheet?.kind === "unsubscribe" && (
+        <UnsubscribeSheet
+          senders={sheet.senders}
+          onClose={() => setSheet(null)}
+          onFinished={sheet.onFinished}
+        />
+      )}
+      {sheet?.kind === "trash" && (
+        <TrashSheet
+          senders={sheet.senders}
+          onClose={() => setSheet(null)}
+          onFinished={sheet.onFinished}
+        />
+      )}
+      <Toasts items={toasts} onDismiss={dismissToast} />
+    </AppContext.Provider>
   );
 }
