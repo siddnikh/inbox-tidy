@@ -4,13 +4,13 @@
 
 Inbox Tidy is one macOS app bundle with two processes:
 
-- **Shell** (`shell/main.m`, Objective-C, about 55 KB). A native Cocoa window hosting a `WKWebView`. It launches the core from `Contents/Resources/inbox-tidy-core --parent-watch`, reads the core's first stdout line `INBOX_TIDY_READY <session-url>`, and loads that URL. Links to anything other than the app's own origin open in the default browser. The core's stderr goes to `~/Library/Logs/Inbox Tidy/core.log`. Quitting the window terminates the core, and the core also exits when the shell's stdin pipe closes.
+- **Shell** (`shell/main.m`, Objective-C, about 55 KB). A native Cocoa window hosting a `WKWebView`. It launches the core from `Contents/Resources/Inbox Tidy Helper --parent-watch`, reads the core's first stdout line `INBOX_TIDY_READY <session-url>`, and loads that URL. Links to anything other than the app's own origin open in the default browser. A transparent 28 pt strip above the web view keeps the window draggable by its top edge, and double-clicking it zooms the window. The core's stderr goes to `~/Library/Logs/Inbox Tidy/core.log`. Quitting the window terminates the core, and the core also exits when the shell's stdin pipe closes.
 - **Core** (`src/core`, TypeScript on Bun, compiled with `bun build --compile` into one binary that embeds the Bun runtime and the bundled UI). It runs an HTTP server on `127.0.0.1` with a random port and serves the UI (`src/ui`, Preact, bundled by Bun's HTML imports) and a JSON API under `/api`.
 
 ```text
 Inbox Tidy.app
 ├─ Contents/MacOS/Inbox Tidy           native window (shell)
-└─ Contents/Resources/inbox-tidy-core  Bun core: API + UI + SQLite + IMAP/SMTP + AI CLI bridge
+└─ Contents/Resources/Inbox Tidy Helper  Bun core: API + UI + SQLite + IMAP/SMTP + AI CLI bridge
         │
         ├─ SQLite: ~/Library/Application Support/Inbox Tidy/inbox-tidy.sqlite
         ├─ macOS Keychain (service "Inbox Tidy"): one item per mail account password

@@ -16,7 +16,7 @@ await compileShell("dist/build/shell");
 console.log("Assembling Inbox Tidy.app…");
 await $`mkdir -p ${CONTENTS}/MacOS ${CONTENTS}/Resources`;
 await $`cp dist/build/shell ${CONTENTS}/MacOS/Inbox\ Tidy`;
-await $`cp dist/build/inbox-tidy-core ${CONTENTS}/Resources/inbox-tidy-core`;
+await $`cp dist/build/inbox-tidy-core ${CONTENTS}/Resources/Inbox\ Tidy\ Helper`;
 if (existsSync("shell/AppIcon.icns"))
   await $`cp shell/AppIcon.icns ${CONTENTS}/Resources/AppIcon.icns`;
 const plist = (await Bun.file("shell/Info.plist").text()).replaceAll("__VERSION__", pkg.version);

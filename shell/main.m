@@ -5,6 +5,25 @@
 #import <WebKit/WebKit.h>
 
 static NSString *const kReadyPrefix = @"INBOX_TIDY_READY ";
+static const CGFloat kTitleBarHeight = 28;
+
+// The web view fills the window under the transparent title bar and would swallow the drags
+// that normally move the window, so this strip above it restores dragging and double-click zoom.
+@interface TitleBarDragView : NSView
+@end
+
+@implementation TitleBarDragView
+- (BOOL)mouseDownCanMoveWindow {
+  return YES;
+}
+- (void)mouseDown:(NSEvent *)event {
+  if (event.clickCount == 2) {
+    [self.window performZoom:nil];
+    return;
+  }
+  [self.window performWindowDragWithEvent:event];
+}
+@end
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate>
 @property(strong) NSWindow *window;
@@ -56,7 +75,15 @@ static NSString *const kReadyPrefix = @"INBOX_TIDY_READY ";
   self.webView.navigationDelegate = self;
   self.webView.UIDelegate = self;
   [self.webView setValue:@NO forKey:@"drawsBackground"];
-  self.window.contentView = self.webView;
+  self.webView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+
+  NSView *container = [[NSView alloc] initWithFrame:frame];
+  [container addSubview:self.webView];
+  TitleBarDragView *drag = [[TitleBarDragView alloc]
+      initWithFrame:NSMakeRect(0, NSHeight(frame) - kTitleBarHeight, NSWidth(frame), kTitleBarHeight)];
+  drag.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
+  [container addSubview:drag positioned:NSWindowAbove relativeTo:self.webView];
+  self.window.contentView = container;
   [self.window makeKeyAndOrderFront:nil];
   [NSApp activateIgnoringOtherApps:YES];
 }
@@ -109,7 +136,7 @@ static NSString *const kReadyPrefix = @"INBOX_TIDY_READY ";
 }
 
 - (void)startCore {
-  NSString *corePath = [[NSBundle mainBundle] pathForResource:@"inbox-tidy-core" ofType:nil];
+  NSString *corePath = [[NSBundle mainBundle] pathForResource:@"Inbox Tidy Helper" ofType:nil];
   if (!corePath) {
     [self showStatusPage:@"Inbox Tidy is missing a part." detail:@"Reinstall the app, then open it again."];
     return;

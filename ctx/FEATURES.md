@@ -12,9 +12,9 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 ## 2. Connect email accounts
 
-- **Status:** Partial
+- **Status:** Built
 - **Built now:** The core API. `GET /api/providers` returns the presets. `POST /api/accounts` validates the request, applies the preset, tests the login (connect, open `INBOX` read-only, log out), saves the password to the Keychain, saves the account, returns `201` with an `AccountSummary`, and starts a background scan. `GET /api/accounts` lists accounts with their non-trashed message counts. `DELETE /api/accounts/:id` removes the Keychain item, the account with its messages and mailbox state, and every sender left with no messages and no `actions` history. Senders whose unsubscribe option came from the removed account take it from their newest remaining message instead.
-- **Remaining:** The screens (provider tiles, steps, form, account list).
+- **Built now (UI):** The add-account sheet (provider tiles, app-password steps with a link to the provider's page, the form with field-level errors, "Checking…"), and the Accounts tab with last-scan status, errors, and Remove with confirmation. Verified end to end against GreenMail: a wrong password gets a plain message, the right one connects and starts a scan.
 - **Problem and outcome:** The user's mail is spread over Gmail, iCloud, Yahoo, and Rediffmail. They connect each one once, and the password is kept safely in the Keychain.
 - **Discovery:** On first open, home shows an "Add your first email account" card. The Accounts tab shows the list and an "Add account" button.
 - **Journey:**
@@ -36,9 +36,9 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 ## 3. Scan mailboxes
 
-- **Status:** Partial
+- **Status:** Built
 - **Built now:** The scanner (`src/core/mail/scanner.ts`) and `GET`/`POST /api/scan`, with incremental sync, staged progress, and per-account errors.
-- **Remaining:** The progress bar, the slim bar, and "Scan again" in the UI.
+- **Built now (UI):** A global scan bar with stage sentences and a determinate bar, a finish toast, and "Scan again" on Home. Verified end to end: 2,232 emails from 15 senders read and sorted by the real Claude in about 17 s, with a follow-up incremental scan taking about 1 s.
 - **Problem and outcome:** The app learns who emails the user, how often, and whether the user reads those emails, without downloading message bodies.
 - **Journey:** A scan starts after an account is connected, or from "Scan again" on home. The user sees a determinate progress bar with a stage sentence. They can move around the app while it runs, and a slim bar remains visible.
 - **Requirements:**
@@ -57,9 +57,9 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 ## 4. Understand senders (insights and AI)
 
-- **Status:** Partial
+- **Status:** Built
 - **Built now:** The core side, in `src/core/insights/` and `src/core/routes/insights.ts`: `GET /api/senders?filter=&sort=&q=` (defaults `all` and `most`), `POST` and `DELETE /api/senders/:id/keep` (each returns the updated `SenderRow`, or 404), the data for `GET /api/summary` (feature 7), and `sortSenders`, which runs the AI sorting with the fallback. It was verified with fake AI clients in unit tests, and once by hand through the real Claude and Codex CLIs, where a batch of 40 took about 18 s and 36 s respectively.
-- **Remaining:** The Senders tab UI, and the scanner calling `sortSenders` during `understanding`.
+- **Built now (UI):** The Senders tab with filters, sort, search, expandable rows, Keep/Stop keeping (optimistic, with rollback), and bulk selection. The scanner calls `sortSenders` during `understanding`. In an end-to-end check, Claude's recommendations were sensible: promotions you ignore were set to unsubscribe, banks, bills, work, and personal senders to keep, and mixed cases to review.
 - **Problem and outcome:** The user sees, in plain words, who emails them most, which senders they ignore, what kind of sender each one is, and what Inbox Tidy recommends.
 - **Discovery:** The Senders tab, plus the top suggestions on home.
 - **Journey:** The Senders tab shows a list sorted by "Most emails", with a filter control (Suggested, All, Can unsubscribe, Unsubscribed, Kept), a sort option (Most emails, Least read, Most recent), and a search box. Each row shows the monogram, name, category, about N a month, how many in 10 the user opens, and the method badge. Expanding a row reveals the AI's one-sentence summary, the reason for the recommendation, recent subjects, and buttons: "Unsubscribe", "Keep" (hide from suggestions), and "Move old emails to Trash".
@@ -77,11 +77,11 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 ## 5. Unsubscribe
 
-- **Status:** Partial
+- **Status:** Built
 - **Problem and outcome:** The user ticks senders and presses one button, and Inbox Tidy unsubscribes in the most reliable way each sender allows.
 - **Journey:** Select senders, press "Unsubscribe from N", and review a sheet listing each sender with the method in plain words. An option reads "Also move their emails to Trash". Press "Unsubscribe". A results list then shows "Done", "Opened in your browser — click the button there", "Couldn't unsubscribe — try their web page", or "No unsubscribe option".
 - **Built now:** `POST /api/actions/unsubscribe` (`src/core/actions/unsubscribe.ts`, `src/core/routes/actions.ts`), verified against GreenMail and local test endpoints.
-- **Remaining:** The selection sheet and the results list in the UI.
+- **Built now (UI):** The confirm sheet with per-method plain wording, an "Also move their emails to Trash" option, live per-sender progress, and results. Verified end to end: a one-click POST reached the local endpoint, a mailto unsubscribe was delivered by SMTP, and a web-only sender opened in the browser.
 - **Requirements:**
   - The request is `{senderIds, alsoTrash}`: 1 to 200 positive integer IDs (a duplicate is handled once) and a boolean. Results come back in request order. An unknown sender gets `not_available` with "That sender is no longer in your list." and no log row.
   - Options come from the `List-Unsubscribe` and `List-Unsubscribe-Post` headers of the sender's newest non-trashed message that has them, or from the sender's stored target when no message does. The header is parsed into its `<…>` entries, which are tried in this order, falling back to the next on failure:
@@ -99,11 +99,11 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 ## 6. Move old emails to Trash
 
-- **Status:** Partial
+- **Status:** Built
 - **Problem and outcome:** The user clears out years of newsletters in one step, and the emails go to Trash so they can still be recovered.
 - **Journey:** Choose "Move old emails to Trash" on a sender or a selection. A sheet offers "All of their emails" or "Only ones older than 30 days", plus an "Only emails I've read" toggle, and shows the count. Pressing "Move N emails to Trash" leads to the result: "Moved 214 emails from Amazon to Trash".
 - **Built now:** `POST /api/actions/trash` and `trashSenderEmails` (`src/core/actions/trash.ts`), verified against GreenMail.
-- **Remaining:** The sheet and the result in the UI, including the count shown before moving.
+- **Built now (UI):** The trash sheet (all emails or only older than 30 days, plus an only-read option) and its results. The count shown before moving is an estimate ("up to N" for the older-than option). Verified end to end: 779 emails moved to the server's Trash, matching the app's count.
 - **Requirements:**
   - The request is `{senderIds, olderThanDays, onlyRead}`: the same sender ID rules as feature 5, an integer from 0 (all emails) to 3650, and a boolean.
   - The sender's matching non-trashed messages are grouped by account and mailbox. Each account gets one IMAP connection, and trash runs on the same account never overlap. Each mailbox's UIDVALIDITY must still match the stored one; if it doesn't, those emails are skipped and the user is asked to scan again.
@@ -117,7 +117,8 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 ## 7. Home: value at a glance
 
-- **Status:** Not started
+- **Status:** Built
+- **Built now:** The welcome card with no accounts; three impact cards with encouraging copy at zero; the inbox overview sentence; the top suggestions with quick Unsubscribe; the last scan time and "Scan again". Verified against real data: "3 senders, 58 fewer emails a month, 779 moved to Trash".
 - **Problem and outcome:** The first screen shows how Inbox Tidy has helped and what to do next.
 - **Journey:**
   - With no accounts, a welcome card explains the app in two sentences and leads to adding an account.
@@ -134,11 +135,10 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 ## 8. Settings
 
-- **Status:** Partial
+- **Status:** Built
 - **Problem and outcome:** The user can choose which AI helper is used and how far back to look.
 - **Built now:** `GET`/`PUT /api/settings`, with validation and persistence.
 - **Built now (UI):** The Settings tab: an AI helper choice (Automatic, which tries Claude and then Codex, or Claude only, or Codex only) saved immediately with a "Saved" confirmation, availability of each helper, "Test the AI helper", a lookback choice (3, 6, 12, or 24 months), and the app version. Connected accounts and Remove live on the Accounts tab.
-- **Remaining:** An end-to-end check of the Settings tab against the real core. So far it has only been checked against a mock API.
 
 ## Future ideas (not committed)
 
