@@ -86,7 +86,10 @@ The system font stack is `-apple-system, BlinkMacSystemFont, "SF Pro Text"/"SF P
 - Text can be zoomed with Cmd and the plus key without breaking the layout.
 - The app follows the system light or dark appearance; both were checked in the native window.
 
+## App icon
+
+The icon is a blue rounded square (the accent gradient) holding a white envelope and a white check badge. The source is `shell/icon/AppIcon.svg`, built into `shell/AppIcon.icns` (all sizes 16–1024).
+
 ## Unresolved
 
-- App icon: not designed. The bundle supports `shell/AppIcon.icns` when one is added.
 - Final product name: "Inbox Tidy" is to be confirmed with the owner.
