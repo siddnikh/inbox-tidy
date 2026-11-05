@@ -12,7 +12,9 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 ## 2. Connect email accounts
 
-- **Status:** Not started
+- **Status:** Partial
+- **Built now:** The core API. `GET /api/providers` returns the presets. `POST /api/accounts` validates the request, applies the preset, tests the login (connect, open `INBOX` read-only, log out), saves the password to the Keychain, saves the account, returns `201` with an `AccountSummary`, and starts a background scan. `GET /api/accounts` lists accounts with their non-trashed message counts. `DELETE /api/accounts/:id` removes the Keychain item, the account with its messages and mailbox state, and every sender left with no messages and no `actions` history. Senders whose unsubscribe option came from the removed account take it from their newest remaining message instead.
+- **Remaining:** The screens (provider tiles, steps, form, account list).
 - **Problem and outcome:** The user's mail is spread over Gmail, iCloud, Yahoo, and Rediffmail. They connect each one once, and the password is kept safely in the Keychain.
 - **Discovery:** On first open, home shows an "Add your first email account" card. The Accounts tab shows the list and an "Add account" button.
 - **Journey:**
@@ -28,11 +30,15 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
   - "Other" accepts custom IMAP and SMTP host, port, and TLS settings.
   - Plain-text connections are refused unless the host is `127.0.0.1` or `localhost`.
   - iCloud's IMAP username is the part before `@`.
-- **Edge cases:** A duplicate email address ("That account is already connected"), the free Rediffmail domain (explain that only Rediffmail Pro supports this kind of connection), and a Keychain write denied.
+  - Email addresses are stored lowercased. Spaces in Gmail app passwords are removed, because Google displays them in groups of four.
+  - Login failures become plain sentences naming the provider. A refused password reads like "Gmail didn't accept that password. Make sure you pasted an app password, not your normal password." and returns `400` with `field: "password"`. An unreachable server (DNS failure, refused connection, timeout) reads "Couldn't reach Gmail. Check your internet connection and try again." and returns `503`. IMAP turned off and TLS failures have their own sentences. Technical details go to the log, never the password.
+- **Edge cases:** A duplicate email address ("That account is already connected.", `409`, checked before connecting), the free Rediffmail domain (refused with the Rediffmail Pro preset's note), and a Keychain write denied (nothing is saved, and the message asks the user to choose Allow).
 
 ## 3. Scan mailboxes
 
-- **Status:** Not started
+- **Status:** Partial
+- **Built now:** The scanner (`src/core/mail/scanner.ts`) and `GET`/`POST /api/scan`, with incremental sync, staged progress, and per-account errors.
+- **Remaining:** The progress bar, the slim bar, and "Scan again" in the UI.
 - **Problem and outcome:** The app learns who emails the user, how often, and whether the user reads those emails, without downloading message bodies.
 - **Journey:** A scan starts after an account is connected, or from "Scan again" on home. The user sees a determinate progress bar with a stage sentence. They can move around the app while it runs, and a slim bar remains visible.
 - **Requirements:**
@@ -41,7 +47,13 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
   - Scans are incremental, using `mailbox_state`: new UIDs above `last_uid` are fetched, flags are refreshed for already-known messages so read and unread stays current, messages no longer on the server are removed, and a UIDVALIDITY change triggers a full rescan.
   - Senders are upserted by lowercased address. Each keeps the newest unsubscribe header (see feature 5 for parsing) and the account it came from.
   - Stages are `connecting`, then `reading` (processed and total per account), then `understanding` (feature 4's AI sorting), then `done`. A failing account records `last_scan_error` and doesn't stop the other accounts.
-- **Edge cases:** An empty inbox, 50,000 or more messages (batches must keep memory flat), messages with no From header (skip them), and encoded or odd sender names.
+  - One scan runs at a time. `POST /api/scan` during a scan returns the running scan's status.
+  - `INBOX` is opened read-only, so scanning never changes read state. Headers are fetched in UID batches of 500, and each batch is written in one transaction.
+  - Every UID in the lookback window that isn't stored yet is fetched, which covers new mail and a widened lookback. Stored messages that left the window, or are gone from the server, are deleted, except ones Inbox Tidy moved to Trash (`trashed_at` set), which stay as history. A UIDVALIDITY change deletes the mailbox's other rows and reads it again.
+  - A sender's display name comes from its newest message that has one. Its unsubscribe method, target, and account come from its newest message that has a `List-Unsubscribe` header. Both use `received_at`, which is the internal date, or the `Date` header when that is missing.
+  - Progress messages read "Connecting to you@gmail.com…", "Reading emails from you@gmail.com (1,200 of 4,000)", and "Sorting your senders (3 of 8)". The scan ends with a summary such as "Finished. You got 4,213 emails from 312 senders in the last 12 months." It adds "Sorted without the AI helper this time." when senders needed sorting and the AI wasn't used, and it names any account that couldn't be read.
+  - A failing account gets a plain `last_scan_error` and appears in `errors`. A successful one gets `last_scan_at` and its error cleared. The scan state is `failed` only when every account failed.
+- **Edge cases:** An empty inbox, 50,000 or more messages (batches keep memory flat), messages with no From address (skipped), and encoded sender names and subjects (RFC 2047 words are decoded).
 
 ## 4. Understand senders (insights and AI)
 

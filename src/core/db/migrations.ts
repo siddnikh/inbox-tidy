@@ -91,7 +91,16 @@ export const migrations: Migration[] = [
       CREATE INDEX actions_sender ON actions(sender_id, kind);
     `,
   },
-  { version: 2, name: "mail-sync", sql: "" },
+  {
+    version: 2,
+    name: "mail-sync",
+    // received_at of the message each field was taken from, so the newest message wins
+    // no matter which order scans see them in.
+    sql: `
+      ALTER TABLE senders ADD COLUMN display_name_at TEXT;
+      ALTER TABLE senders ADD COLUMN unsubscribe_at TEXT;
+    `,
+  },
   { version: 3, name: "insights", sql: "" },
   { version: 4, name: "actions", sql: "" },
 ];
