@@ -7,7 +7,7 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 - **Status:** Built
 - **Problem and outcome:** The user double-clicks Inbox Tidy and gets a native Mac window that works without any setup in Terminal.
 - **Journey:** Open from Applications, see "Opening Inbox Tidy…", and then the app's screens load. Quitting the window stops everything in the background.
-- **Built now:** The native shell, the bundled core, the session guard, `GET /api/health` (database and AI tool availability), `POST /api/ai/check` (a real one-word round trip through Claude, falling back to Codex), and `GET`/`PUT /api/settings`. The current home screen only shows AI helper status and a "Test the AI helper" button, until feature 6 replaces it.
+- **Built now:** The native shell, the bundled core, the session guard, `GET /api/health` (database and AI tool availability), `POST /api/ai/check` (a real one-word round trip through Claude, falling back to Codex), and `GET`/`PUT /api/settings`. The starter screen has been replaced by the full UI (see features 2 to 8), which talks to the routes in `src/shared/api.ts`.
 - **Edge cases:** A missing core binary, a core that never becomes ready (20 s), and a core that crashes each show a plain-language page in the window pointing to the log.
 
 ## 2. Connect email accounts
@@ -137,7 +137,8 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 - **Status:** Partial
 - **Problem and outcome:** The user can choose which AI helper is used and how far back to look.
 - **Built now:** `GET`/`PUT /api/settings`, with validation and persistence.
-- **Remaining:** The Settings tab: an AI helper choice (Automatic, which tries Claude and then Codex, or Claude only, or Codex only) with "Test the AI helper", a lookback choice (3, 6, 12, or 24 months), a list of connected accounts with remove, and the app version.
+- **Built now (UI):** The Settings tab: an AI helper choice (Automatic, which tries Claude and then Codex, or Claude only, or Codex only) saved immediately with a "Saved" confirmation, availability of each helper, "Test the AI helper", a lookback choice (3, 6, 12, or 24 months), and the app version. Connected accounts and Remove live on the Accounts tab.
+- **Remaining:** An end-to-end check of the Settings tab against the real core. So far it has only been checked against a mock API.
 
 ## Future ideas (not committed)
 
