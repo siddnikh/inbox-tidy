@@ -10,3 +10,4 @@ coverage/
 *.sqlite-*
 qa-artifacts/
 screenshots/
+.claude/worktrees/
