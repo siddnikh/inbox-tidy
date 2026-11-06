@@ -1,17 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2E8BFF"/>
-      <stop offset="1" stop-color="#0060D6"/>
-    </linearGradient>
-    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#E8F0FC"/>
-    </linearGradient>
-  </defs>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
-  <rect x="232" y="330" width="560" height="380" rx="56" fill="url(#paper)"/>
-  <path d="M262 370 L512 552 L762 370" fill="none" stroke="#0060D6" stroke-opacity="0.35" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="742" cy="680" r="128" fill="#FFFFFF"/>
-  <path d="M686 682 L728 724 L802 646" fill="none" stroke="#0071E3" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Inbox Tidy"><title>Inbox Tidy</title><defs><linearGradient id="bg" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6D49E2"/><stop offset=".55" stop-color="#5B34D6"/><stop offset="1" stop-color="#3F21A3"/></linearGradient><linearGradient id="tray" x1="0" y1="478" x2="0" y2="772" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E8E1FA"/></linearGradient><linearGradient id="spark" x1="0" y1="224" x2="0" y2="568" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFDA70"/><stop offset="1" stop-color="#FFCB47"/></linearGradient></defs><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/><ellipse cx="512" cy="784" rx="270" ry="16" fill="#140D29" opacity=".18"/><path d="M232 478A32 32 0 0 1 296 478V566Q296 590 320 590H388Q412 590 422 612L434 640Q444 662 470 662H554Q580 662 590 640L602 612Q612 590 636 590H704Q728 590 728 566V478A32 32 0 0 1 792 478V700Q792 772 720 772H304Q232 772 232 700Z" fill="url(#tray)"/><path d="M512 224Q558.4 349.6 684 396Q558.4 442.4 512 568Q465.6 442.4 340 396Q465.6 349.6 512 224Z" fill="url(#spark)"/><path d="M708 204Q723.7 246.3 766 262Q723.7 277.7 708 320Q692.3 277.7 650 262Q692.3 246.3 708 204Z" fill="#B9A9E8"/></svg>

@@ -49,3 +49,4 @@ The overnight build of Inbox Tidy (2026-11-06) is complete: connecting accounts,
   - The home screen showed "3 senders, 58 fewer a month, 779 trashed". A rescan took about 1 s and kept the numbers stable.
   - The packaged app, launched the way Finder launches it, found both AI CLIs, scanned, and sorted 13 senders in about 12 s, with no Keychain prompt when it created its own item.
 - 2026-11-06: Final checks: 106 unit tests and 15 integration tests pass, lint and typecheck are clean. The app (64 MB) is installed in /Applications and opens to the welcome screen.
+- 2026-11-06: New logo in the owner's purple and yellow palette: an inbox tray with a rising spark replaces the blue envelope icon. The icns is rebuilt (16–1024), and the logo suite is in `assets/brand/`.
