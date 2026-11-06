@@ -1,11 +1,19 @@
+import type { Database } from "bun:sqlite";
+
 export interface Migration {
   version: number;
   name: string;
   sql: string;
+  run?: (db: Database) => void;
 }
 
-// Versions 2-4 are reserved slots so parallel feature work can add schema without colliding:
-// 2 = mail sync, 3 = insights, 4 = actions. An empty sql string is a valid no-op migration.
+function hasColumn(db: Database, table: string, column: string): boolean {
+  return db
+    .query<{ name: string }, []>(`SELECT name FROM pragma_table_info('${table}')`)
+    .all()
+    .some((row) => row.name === column);
+}
+
 export const migrations: Migration[] = [
   {
     version: 1,
@@ -107,4 +115,17 @@ export const migrations: Migration[] = [
     sql: "CREATE INDEX messages_sender_stats ON messages(sender_id, received_at, trashed_at, is_read);",
   },
   { version: 4, name: "actions", sql: "" },
+  {
+    version: 5,
+    name: "repair-skipped-slots",
+    // Builds that shipped while versions 2-4 were still empty placeholders marked databases as
+    // version 4 without ever running 2 and 3, so re-apply them wherever they are missing.
+    sql: "CREATE INDEX IF NOT EXISTS messages_sender_stats ON messages(sender_id, received_at, trashed_at, is_read);",
+    run: (db) => {
+      for (const column of ["display_name_at", "unsubscribe_at"]) {
+        if (!hasColumn(db, "senders", column))
+          db.run(`ALTER TABLE senders ADD COLUMN ${column} TEXT`);
+      }
+    },
+  },
 ];

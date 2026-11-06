@@ -54,7 +54,7 @@ Every `/api` request must (1) target exactly `127.0.0.1:<port>` or `localhost:<p
 
 ### Data model (`src/core/db/migrations.ts`)
 
-`accounts`, `mailbox_state` (UIDVALIDITY plus the highest scanned UID, for incremental rescans), `senders` (one row per lowercased address, holding its unsubscribe method and target and its AI category, summary, and recommendation), `messages` (headers only: subject, date, read flag, List-Unsubscribe headers, trashed_at), `actions` (an unsubscribe and trash log used for the home screen's impact numbers), and `settings`. Migrations are an ordered list applied through `PRAGMA user_version`. Versions 2, 3, and 4 are reserved slots for mail sync, insights, and actions.
+`accounts`, `mailbox_state` (UIDVALIDITY plus the highest scanned UID, for incremental rescans), `senders` (one row per lowercased address, holding its unsubscribe method and target and its AI category, summary, and recommendation), `messages` (headers only: subject, date, read flag, List-Unsubscribe headers, trashed_at), `actions` (an unsubscribe and trash log used for the home screen's impact numbers), and `settings`. Migrations are an ordered list applied through `PRAGMA user_version`; each has SQL and an optional `run` step. Never leave an empty placeholder version for later work: a database that passes it is marked done and never runs what is filled in afterwards. Migration 5 repairs databases created while versions 2 to 4 were placeholders by re-adding the columns and index that 2 and 3 introduced, only where they are missing.
 
 ## Technologies
 
