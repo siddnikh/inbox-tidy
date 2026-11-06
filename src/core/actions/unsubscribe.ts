@@ -1,5 +1,6 @@
 import type { ActionResult, ActionStatus, UnsubscribeMethod } from "../../shared/api.ts";
 import type { AppContext } from "../context.ts";
+import { HttpError } from "../http.ts";
 import { emailsPerMonth } from "../insights/rate.ts";
 import { getAccount, sendMail } from "../mail/connection.ts";
 import {
@@ -24,7 +25,9 @@ export const MAX_BROWSER_OPENS = 10;
 export const MESSAGES = {
   oneClick: "Unsubscribed.",
   mailto: "Unsubscribed by sending them an email.",
-  opened: "Opened their unsubscribe page in your browser. Press the button there to finish.",
+  opened:
+    'Opened their unsubscribe page in your browser. Finish there, then tick "I\'ve unsubscribed" in Inbox Tidy.',
+  confirmed: "You finished unsubscribing on their web page.",
   failed: "Couldn't unsubscribe automatically. Try again later.",
   none: "This sender doesn't offer a way to unsubscribe. You can move their emails to Trash instead.",
   tooManyPages: `Inbox Tidy opens at most ${MAX_BROWSER_OPENS} unsubscribe pages at a time. Try this sender again in a smaller batch.`,
@@ -223,4 +226,29 @@ export async function unsubscribeSenders(
   return mapLimit(senderIds, UNSUBSCRIBE_CONCURRENCY, (id) =>
     unsubscribeOne(ctx, id, alsoTrash, run, resolved),
   );
+}
+
+// The app can't see what happens on a sender's web page, so a web unsubscribe only counts once
+// the user confirms it. The confirmation copies the opened attempt's monthly rate snapshot.
+export function confirmWebUnsubscribe(ctx: AppContext, senderId: number): void {
+  const latest = ctx.db
+    .query<{ status: string; emails_per_month_before: number | null }, [number]>(
+      `SELECT status, emails_per_month_before FROM actions
+       WHERE sender_id = ? AND kind = 'unsubscribe' ORDER BY id DESC LIMIT 1`,
+    )
+    .get(senderId);
+  if (latest?.status !== "opened_in_browser") {
+    throw new HttpError(
+      409,
+      "This sender isn't waiting for you to finish on a web page. Refresh and try again.",
+    );
+  }
+  logAction(ctx, {
+    senderId,
+    kind: "unsubscribe",
+    method: "web",
+    status: "done",
+    detail: MESSAGES.confirmed,
+    emailsPerMonthBefore: latest.emails_per_month_before,
+  });
 }

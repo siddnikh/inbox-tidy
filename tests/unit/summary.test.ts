@@ -81,9 +81,10 @@ test("summary counts impact from the latest actions and the inbox over the windo
   addMessages(ctx, first, friend, [{ daysAgo: 2, read: true }], NOW);
 
   const summary = homeSummary(ctx, { now: NOW });
+  // The web page was only opened, so it doesn't count until the user confirms it.
   expect(summary.impact).toEqual({
-    sendersUnsubscribed: 2,
-    emailsAvoidedPerMonth: 16,
+    sendersUnsubscribed: 1,
+    emailsAvoidedPerMonth: 12,
     emailsTrashed: 120,
   });
   const total = 6;

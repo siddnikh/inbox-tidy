@@ -49,6 +49,12 @@ export function SenderBadges({ sender }: { sender: SenderRow }) {
   return (
     <span class="badges">
       {isSuggested(sender) && <span class="badge badge-accent">Suggested</span>}
+      {sender.status === "finish_on_web" && (
+        <span class="badge badge-accent">
+          <Icon name="globe" size={12} />
+          Finish on their web page
+        </span>
+      )}
       {sender.status === "unsubscribed" && <span class="badge">Unsubscribed</span>}
       {sender.status === "kept" && <span class="badge">Kept</span>}
       <MethodBadge method={sender.unsubscribeMethod} />
@@ -61,25 +67,31 @@ export function SenderListRow({
   selected,
   expanded,
   keepPending,
+  confirmPending,
   onSelect,
   onExpand,
   onUnsubscribe,
   onToggleKeep,
   onTrash,
+  onConfirm,
 }: {
   sender: SenderRow;
   selected: boolean;
   expanded: boolean;
   keepPending: boolean;
+  confirmPending: boolean;
   onSelect: (selected: boolean) => void;
   onExpand: () => void;
   onUnsubscribe: () => void;
   onToggleKeep: () => void;
   onTrash: () => void;
+  onConfirm: () => void;
 }) {
   const name = senderName(sender);
   const detailsId = `sender-details-${sender.id}`;
-  const canUnsubscribe = sender.unsubscribeMethod !== "none" && sender.status !== "unsubscribed";
+  const finishing = sender.status === "finish_on_web";
+  const canUnsubscribe =
+    sender.unsubscribeMethod !== "none" && sender.status !== "unsubscribed" && !finishing;
   return (
     <li class={`list-row sender-row ${selected ? "is-selected" : ""}`}>
       <div class="sender-head">
@@ -132,7 +144,30 @@ export function SenderListRow({
               </ul>
             </div>
           )}
+          {finishing && (
+            <Hint icon="globe">
+              Inbox Tidy opened this sender's unsubscribe page. Once you've finished there, tick
+              "I've unsubscribed" so it counts.
+            </Hint>
+          )}
           <div class="button-row">
+            {finishing && (
+              <>
+                <button
+                  type="button"
+                  class="button button-primary"
+                  onClick={onConfirm}
+                  disabled={confirmPending}
+                >
+                  <Icon name="check" size={14} />
+                  {confirmPending ? "Saving…" : "I've unsubscribed"}
+                </button>
+                <button type="button" class="button" onClick={onUnsubscribe}>
+                  <Icon name="external" size={14} />
+                  Open the page again
+                </button>
+              </>
+            )}
             {canUnsubscribe && (
               <button type="button" class="button button-primary" onClick={onUnsubscribe}>
                 <Icon name="bellOff" size={14} />

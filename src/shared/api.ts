@@ -126,9 +126,20 @@ export type SenderCategory =
 
 export type Recommendation = "unsubscribe" | "keep" | "review";
 export type UnsubscribeMethod = "one_click" | "mailto" | "web" | "none";
-export type SenderStatus = "active" | "unsubscribed" | "kept";
-export type SenderFilter = "suggested" | "all" | "can_unsubscribe" | "kept" | "unsubscribed";
+// "finish_on_web": Inbox Tidy opened the sender's unsubscribe page, and the user hasn't yet
+// confirmed they finished there. It doesn't count as unsubscribed until they do.
+export type SenderStatus = "active" | "finish_on_web" | "unsubscribed" | "kept";
+export type SenderFilter =
+  | "suggested"
+  | "all"
+  | "can_unsubscribe"
+  | "finish_on_web"
+  | "kept"
+  | "unsubscribed";
 export type SenderSort = "most" | "least_read" | "recent";
+
+// POST /api/senders/:id/confirm-unsubscribe -> SenderRow. The user says they finished on the
+// sender's unsubscribe page; 409 unless the sender is "finish_on_web".
 
 // GET /api/senders?filter=SenderFilter&sort=SenderSort&q=search&account=id -> SenderRow[]
 // With account, stats and subjects count only that account's emails.

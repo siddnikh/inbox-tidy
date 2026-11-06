@@ -21,7 +21,7 @@ function resultHeadline(results: ActionResult[]): string {
   if (done) parts.push(`Unsubscribed from ${plural(done, "sender")}.`);
   if (opened)
     parts.push(
-      `Opened ${plural(opened, "page", "pages")} in your browser. Press the unsubscribe button there to finish.`,
+      `Opened ${plural(opened, "page", "pages")} in your browser. Finish on each page, then tick "I've unsubscribed" on Home so it counts.`,
     );
   if (failed) parts.push(`${plural(failed, "sender")} didn't work. Their details are below.`);
   if (!parts.length) return "Nothing was unsubscribed.";

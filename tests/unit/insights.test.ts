@@ -50,7 +50,7 @@ function seed(ctx: AppContext) {
   addMessages(ctx, account, kept, [{ daysAgo: 4 }, { daysAgo: 5, read: true }], NOW);
   const gone = addSender(ctx, { address: "promo@gone.example", method: "web" });
   addMessages(ctx, account, gone, [{ daysAgo: 20, trashed: true }], NOW);
-  addAction(ctx, { senderId: gone, kind: "unsubscribe", status: "opened_in_browser" });
+  addAction(ctx, { senderId: gone, kind: "unsubscribe", status: "done" });
   const retried = addSender(ctx, { address: "a@retry.example", method: "one_click" });
   addMessages(ctx, account, retried, [{ daysAgo: 2 }], NOW);
   addAction(ctx, { senderId: retried, kind: "unsubscribe", status: "done" });

@@ -10,6 +10,7 @@ import { ScanCard } from "../components/ScanBar.tsx";
 import { SegmentedTabs } from "../components/Segmented.tsx";
 import { Monogram, SenderSubtitle, senderName } from "../components/Sender.tsx";
 import { formatNumber, inboxOverview, monthlyRate, readShare, relativeTime } from "../format.ts";
+import { useConfirmUnsubscribe } from "../use-confirm-unsubscribe.ts";
 import { useLoad } from "../use-load.ts";
 
 function ImpactCards({ impact }: { impact: HomeSummary["impact"] }) {
@@ -108,6 +109,70 @@ function Welcome() {
           Add an email account
         </button>
       </div>
+    </section>
+  );
+}
+
+function FinishOnWeb({ accountId }: { accountId: number | null }) {
+  const app = useApp();
+  const confirming = useConfirmUnsubscribe();
+  const scope = accountId === null ? "" : `&account=${accountId}`;
+  const list = useLoad(
+    () => api<SenderRow[]>(`/api/senders?filter=finish_on_web&sort=most${scope}`),
+    `finish${scope}`,
+    app.version,
+  );
+  const rows = list.data;
+  if (!rows || rows.length === 0) return null;
+
+  return (
+    <section class="card finish-card" aria-labelledby="finish-title">
+      <div class="finish-head">
+        <IconTile name="globe" tone="brand" />
+        <div>
+          <h2 class="title" id="finish-title">
+            Finish unsubscribing
+          </h2>
+          <p class="callout secondary">
+            These senders only offer an unsubscribe web page. Inbox Tidy opened it for you, but it
+            can't see what you do there. Finish on each page, then tick it here so it counts.
+          </p>
+        </div>
+      </div>
+      <ul class="list finish-list">
+        {rows.map((s) => {
+          const saving = confirming.pending.has(s.id);
+          return (
+            <li key={s.id} class="list-row finish-row">
+              <label class="finish-check">
+                <input
+                  type="checkbox"
+                  checked={saving}
+                  disabled={saving}
+                  onChange={() => confirming.confirm(s)}
+                />
+                <Monogram sender={s} />
+                <span class="row-text">
+                  <span class="row-title">{senderName(s)}</span>
+                  <span class="row-subtitle">
+                    {saving ? "Saving…" : `I've unsubscribed from ${s.domain}`}
+                  </span>
+                </span>
+              </label>
+              <span class="row-rate">{monthlyRate(s.emailsPerMonth)}</span>
+              <button
+                type="button"
+                class="button button-small"
+                onClick={() => app.openUnsubscribe([s])}
+                aria-label={`Open the unsubscribe page for ${senderName(s)} again`}
+              >
+                <Icon name="external" size={13} />
+                Open page again
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
@@ -342,6 +407,7 @@ export function Home() {
       {scanCard}
       <ImpactCards impact={data.impact} />
       <p class="body overview">{inboxOverview(data)}</p>
+      <FinishOnWeb accountId={selected} />
       <Suggestions accountId={selected} />
       <ScanFooter lastScanAt={data.lastScanAt} />
     </div>
