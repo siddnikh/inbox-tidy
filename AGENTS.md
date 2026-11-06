@@ -19,11 +19,11 @@ These are the rules for contributors and coding agents working on this repositor
 
 ## Local-first development
 
-- Everything runs on the Mac. The only remote runtime dependencies are AI inference (through the user's `claude` and `codex` CLIs) and the user's own mail providers.
+- Everything runs on the Mac. The only remote runtime dependencies are AI inference (through the user's `claude` and `codex` CLIs, or OpenRouter with the user's own key) and the user's own mail providers.
 - Use Bun exclusively for JavaScript and TypeScript (`bun install`, `bun run`, `bun test`, `bunx`). Never add npm, pnpm, or Yarn lockfiles or commands.
 - Use the Makefile targets documented in `ctx/TECH.md`. `make infra-up` starts the local GreenMail test mail server in Docker (Colima).
 - Never connect to, read, modify, unsubscribe from, or trash anything in a real mailbox during development or QA. Use the GreenMail server on `127.0.0.1` only. Before any QA that writes data, confirm `INBOX_TIDY_DATA_DIR` points at a local scratch or dev directory and that every configured mail host is `127.0.0.1` or `localhost`. If that cannot be proven, stop.
-- Never send real AI requests in automated tests; inject a fake `AiClient`. Manual QA may use the real CLIs.
+- Never send real AI or OpenRouter requests in automated tests; inject a fake `AiClient` and a fake fetch. Manual QA may use the real CLIs.
 
 ## Safety invariants
 

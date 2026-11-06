@@ -58,8 +58,8 @@ It works with **Gmail, iCloud Mail, Yahoo Mail, Rediffmail Pro**, and any other 
   - whether they offer a way to unsubscribe
   - up to five recent subject lines, cut to 100 characters each
 
-  It never sees email bodies, your own email address, or your passwords. Subject lines can contain personal details, such as your name or an order number, so keep that in mind. The request goes through the `claude` (or `codex`) CLI that you already use and are signed in to, with its tools turned off and in an empty temporary folder. Its answers are checked against a fixed list of categories before they're used. The terms of your Claude or ChatGPT plan apply to these requests.
-- **Connections are limited.** At runtime Inbox Tidy connects only to your mail providers over encrypted connections, to the AI through your own CLI, and to the unsubscribe links of the senders you choose.
+  It never sees email bodies, your own email address, or your passwords. Subject lines can contain personal details, such as your name or an order number, so keep that in mind. With Claude Code or Codex, the request goes through the CLI that you already use and are signed in to, with its tools turned off and in an empty temporary folder, and the terms of your Claude or ChatGPT plan apply. With OpenRouter, the same details go to OpenRouter and to the company that runs the model you choose, billed to your OpenRouter account. Either way, the answers are checked against a fixed list of categories before they're used.
+- **Connections are limited.** At runtime Inbox Tidy connects only to your mail providers over encrypted connections, to the AI through your own CLI or OpenRouter, and to the unsubscribe links of the senders you choose.
 
 ## Requirements
 
@@ -150,13 +150,38 @@ make install-app
 
 ### Set up the AI helper (recommended)
 
-Inbox Tidy uses the Claude Code CLI from your Claude subscription, and falls back to Codex from your ChatGPT subscription. Install at least one by following its official guide ([Claude Code](https://docs.anthropic.com/en/docs/claude-code/setup), [Codex](https://developers.openai.com/codex/cli)). Then run it once in Terminal and sign in:
+The AI helper sorts your senders and suggests who to drop. Pick **one** of these. You can set any of them up from inside the app: open Inbox Tidy, go to **Settings**, and look under **AI helper**. Each option shows whether it's ready and, if not, numbered steps with a **Copy** button for each command.
 
-```sh
-claude
-```
+**Option 1: Claude Code** (if you pay for Claude Pro or Max)
+1. Open Terminal: press <kbd>⌘</kbd> <kbd>Space</kbd>, type `Terminal`, and press Return.
+2. Install it. Paste this line and press Return:
+   ```sh
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+3. Sign in. Paste this line and press Return. Your browser opens, so sign in with your Claude account there:
+   ```sh
+   ~/.local/bin/claude auth login
+   ```
+4. Back in Inbox Tidy, press **Check again** in Settings. Claude Code should say **Ready**.
 
-Type `/exit` when you're signed in. Then, in Inbox Tidy, open **Settings** and press **Test the AI helper**. You can also choose there whether to use Claude, Codex, or both.
+**Option 2: Codex** (if you pay for ChatGPT Plus, Pro, or Team)
+1. Open Terminal as above.
+2. Install it:
+   ```sh
+   curl -fsSL https://chatgpt.com/codex/install.sh | sh
+   ```
+3. Sign in with your ChatGPT account in the browser window that opens:
+   ```sh
+   ~/.local/bin/codex login
+   ```
+4. Press **Check again** in Settings.
+
+**Option 3: OpenRouter** (pay as you go, with no subscription and no Terminal)
+1. Create an account at [openrouter.ai](https://openrouter.ai), add a little credit, and create a key under [Keys](https://openrouter.ai/settings/keys). It starts with `sk-or-`.
+2. In Inbox Tidy, open **Settings** › **AI helper** › **OpenRouter**, paste the key, and press **Save**. It's stored only in your Mac's Keychain.
+3. Choose a model, or keep the suggested one. Each model shows its price and a rough cost to sort 100 senders, usually under a few cents.
+
+If more than one is set up, **Automatic** uses Claude Code first, then Codex, then OpenRouter. You can pick one yourself in Settings, and **Test the AI helper** checks that it answers.
 
 ## First use: connect your email
 
