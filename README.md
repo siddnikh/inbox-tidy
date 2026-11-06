@@ -26,7 +26,7 @@ Inbox Tidy is a personal macOS app that you open by double-clicking it, like any
 
 - **Shows who emails you most.** It reads your inbox's email headers from the last 12 months. For each sender it shows roughly how many emails a month they send and how many of them you open.
 - **Recommends who to unsubscribe from.** Your own Claude Code CLI sorts your senders into categories such as shopping, news, bills, and personal, and suggests which ones to drop. If Claude Code isn't available it falls back to Codex, and without either it uses a simple built-in rule.
-- **Unsubscribes for you.** It uses whatever method the sender offers. Some senders support automatic one-click unsubscribing. Others need an unsubscribe email, which Inbox Tidy sends from your account. If a sender only has a web page, Inbox Tidy opens it in your browser.
+- **Unsubscribes for you.** It uses whatever method the sender offers. Some senders support automatic one-click unsubscribing. Others need an unsubscribe email, which Inbox Tidy sends from your account. If a sender only has a web page, Inbox Tidy opens it in your browser. It can't see what you do there, so that sender waits under **Finish unsubscribing** on Home until you tick **I've unsubscribed**.
 - **Moves old email to Trash.** You can trash all of a sender's emails, or only the ones older than 30 days, with an option to keep unread ones. They go to your provider's Trash, so you can still get them back.
 - **Shows what you've achieved.** The home screen counts the senders you've left, the emails you'll no longer get each month, and the emails you've cleared.
 
@@ -150,7 +150,8 @@ Then:
 1. Open **Senders** to see who emails you most. **Suggested** lists the senders Inbox Tidy recommends dropping. Click a sender to see why.
 2. Tick the senders you want to leave and press **Unsubscribe from N**. Tick **Also move their emails to Trash** if you want them gone too. Check the list, then confirm.
 3. Press **Keep** on any sender you want to hear from, and it won't be suggested again.
-4. Come back to **Home** to see your progress. Press **Scan again** now and then to pick up new mail.
+4. If a sender's unsubscribe page opened in your browser, finish there, then tick it under **Finish unsubscribing** on Home. Only ticked senders count in your progress.
+5. Come back to **Home** to see your progress. With more than one account, use the tabs at the top of Home to see one account at a time. A scan in progress shows as a large card there. Press **Scan again** now and then to pick up new mail.
 
 ## Update
 
