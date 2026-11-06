@@ -117,9 +117,17 @@ README screenshots (`docs/screenshots/*.png`) are captured from the real UI in h
 | All fast checks | `make check` |
 | Build `dist/Inbox Tidy.app` | `make build` |
 | Build and install to `/Applications` | `make install-app` |
+| Build both release zips locally (Apple Silicon and Intel) | `make release` |
 | Full QA gate | `make qa` |
 
 In dev, frontend edits hot-reload. Backend edits restart the core on the same port and token; press Cmd+R in the window afterwards.
+
+## Releasing
+
+- Downloads are published as GitHub releases by `.github/workflows/release.yml` when a `v*` tag is pushed. It builds on `macos-15` (Apple Silicon) and `macos-15-intel` (Intel). Each job runs lint, typecheck, and unit tests, builds with `scripts/build-app.ts --arch arm64|x64`, starts the built core with `scripts/smoke-test-app.ts`, which checks `/api/health` and the UI page, then zips the app with `ditto`. The publish job checks that the tag matches `package.json`'s version and creates the release from `docs/releases/<tag>.md`, with both zips and `SHA256SUMS.txt`. `workflow_dispatch` runs the builds without publishing.
+- To release: bump `version` in `package.json`, write `docs/releases/v<version>.md`, merge, then `git tag v<version> && git push origin v<version>`.
+- Intel builds use Bun's `bun-darwin-x64-baseline` target so they run on Intel Macs without AVX2. Bun's x64 runtime doesn't start under Rosetta on macOS 14 (it dies with an illegal instruction), so Intel builds can only be checked on the Intel CI runner, not on an Apple Silicon Mac.
+- Builds are ad-hoc signed and not notarized, because no Developer ID certificate is available. Downloaded copies therefore need the one-time "Open Anyway" step described in the README. A Developer ID and notarization would remove it.
 
 ## Ports and URLs
 
