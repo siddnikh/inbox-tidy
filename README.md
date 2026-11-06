@@ -63,22 +63,49 @@ It works with **Gmail, iCloud Mail, Yahoo Mail, Rediffmail Pro**, and any other 
 
 ## Requirements
 
-- A Mac running **macOS 13 Ventura or later**. It has been tested on Apple Silicon; Intel Macs should build too but haven't been tried.
-- About 3 GB of free space for Apple's Command Line Tools (a one-time install). Inbox Tidy itself takes about 64 MB.
-- **[Bun](https://bun.sh) 1.3 or later**, used to build the app.
-- **Recommended:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code/setup) signed in to your Claude account, or the [Codex CLI](https://developers.openai.com/codex/cli) signed in to ChatGPT. Without either, Inbox Tidy still works but its suggestions are simpler.
+- A Mac running **macOS 13 Ventura or later**, with either an Apple Silicon (M1 or newer) or an Intel processor. There's a download for each.
+- About 70 MB of free space.
+- **Recommended:** an AI helper, either [Claude Code](https://docs.anthropic.com/en/docs/claude-code/setup) signed in to your Claude account, [Codex](https://developers.openai.com/codex/cli) signed in to ChatGPT, or an [OpenRouter](https://openrouter.ai) key. Without one, Inbox Tidy still works but its suggestions are simpler. See [Set up the AI helper](#set-up-the-ai-helper-recommended).
 - For each email account, an **app password**. See [First use](#first-use-connect-your-email).
 
 ## Install
 
-There are no ready-made downloads yet, so you build the app on your own Mac. It takes about ten minutes, mostly waiting. You'll paste a few commands into Terminal. Press Return after each one and wait for it to finish before the next.
+### Download (easiest)
+
+**1. Check which Mac you have.** Click the Apple menu  in the top-left corner and choose **About This Mac**.
+- If it says **Chip: Apple M1** (or M2, M3, M4, and so on), you have an **Apple Silicon** Mac.
+- If it says **Processor: … Intel …**, you have an **Intel** Mac.
+
+**2. Download the matching file** from the [latest release](https://github.com/siddnikh/inbox-tidy/releases/latest):
+- Apple Silicon: `Inbox-Tidy-…-macOS-Apple-Silicon.zip`
+- Intel: `Inbox-Tidy-…-macOS-Intel.zip`
+
+**3. Open the zip** (double-click it in Downloads) and **drag Inbox Tidy into your Applications folder**.
+
+**4. Open it the first time.** Inbox Tidy isn't signed with a paid Apple developer certificate yet, so macOS asks you to confirm once. You won't need to do this again.
+- **macOS 15 Sequoia or later:** double-click Inbox Tidy. When macOS says it can't verify the app, click **Done**. Open **System Settings** › **Privacy & Security**, scroll down to the message about Inbox Tidy, click **Open Anyway**, and type your Mac password. Then click **Open Anyway** once more.
+- **macOS 13 Ventura or 14 Sonoma:** in Applications, hold <kbd>Control</kbd> and click Inbox Tidy, choose **Open**, then click **Open** again.
+
+You should see "Welcome to Inbox Tidy". If macOS instead says the app "is damaged", that's the same warning in a different form. Open Terminal (press <kbd>⌘</kbd> <kbd>Space</kbd>, type `Terminal`, press Return), paste this, and press Return:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Inbox Tidy.app"
+```
+
+Then open Inbox Tidy again.
+
+To check a download, compare its SHA-256 (`shasum -a 256 ~/Downloads/Inbox-Tidy-*.zip`) with `SHA256SUMS.txt` on the release page.
+
+### Build it yourself
+
+If you'd rather build the app from the source code, it takes about ten minutes, mostly waiting. You'll paste a few commands into Terminal. Press Return after each one and wait for it to finish before the next.
 
 > [!TIP]
 > If you use Claude Code or Codex, it can do these steps for you. See [Install with an AI agent](docs/INSTALL_WITH_AN_AGENT.md).
 
 **1. Open Terminal.** Press <kbd>⌘</kbd> <kbd>Space</kbd>, type `Terminal`, and press Return.
 
-**2. Install Apple's Command Line Tools.** These give your Mac the compiler that builds the app's window.
+**2. Install Apple's Command Line Tools** (about 3 GB, a one-time install). These give your Mac the compiler that builds the app's window.
 
 ```sh
 xcode-select --install
@@ -98,9 +125,9 @@ When it finishes, **quit Terminal (<kbd>⌘</kbd> <kbd>Q</kbd>) and open it agai
 bun --version
 ```
 
-You should see a number such as `1.3.2`.
+You should see a number such as `1.3.14`.
 
-**4. Download Inbox Tidy.** This copies the source code into a folder called `inbox-tidy` in your home folder, then moves Terminal into that folder.
+**4. Get the source code.** This copies it into a folder called `inbox-tidy` in your home folder, then moves Terminal into that folder.
 
 ```sh
 git clone https://github.com/siddnikh/inbox-tidy.git ~/inbox-tidy
@@ -119,7 +146,7 @@ make install
 make install-app
 ```
 
-**7. Open Inbox Tidy** from Launchpad, Spotlight, or your Applications folder. You should see "Welcome to Inbox Tidy".
+**7. Open Inbox Tidy** from Launchpad, Spotlight, or your Applications folder. You should see "Welcome to Inbox Tidy". An app you built yourself opens without the security step above.
 
 ### Set up the AI helper (recommended)
 
@@ -155,7 +182,9 @@ Then:
 
 ## Update
 
-Open Terminal and run:
+**If you downloaded it:** quit Inbox Tidy, download the newest zip from the [latest release](https://github.com/siddnikh/inbox-tidy/releases/latest), and drag the new Inbox Tidy into Applications, choosing **Replace**. Your accounts and history are kept. You may need to do the first-open step again.
+
+**If you built it yourself:** open Terminal and run:
 
 ```sh
 cd ~/inbox-tidy
@@ -164,7 +193,9 @@ make install
 make install-app
 ```
 
-`make install-app` quits Inbox Tidy if it's open and replaces the old app. Your accounts and history are kept. After an update, macOS may ask about the Keychain again. Choose **Always Allow**.
+`make install-app` quits Inbox Tidy if it's open and replaces the old app. Your accounts and history are kept.
+
+Either way, macOS may ask about the Keychain again after an update. Type your Mac password and choose **Always Allow**.
 
 ## Uninstall
 
