@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type {
   AiCheckResponse,
+  AiHelperState,
+  AiHelpersResponse,
   AiProviderChoice,
+  AiProviderId,
   AppSettings,
   HealthResponse,
 } from "../../shared/api.ts";
@@ -11,12 +14,25 @@ import { ErrorNotice, Hint, InlineError } from "../components/Feedback.tsx";
 import { Icon, IconTile } from "../components/Icon.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
 import { useLoad } from "../use-load.ts";
+import { CliHelperCard } from "./settings/CliHelperCard.tsx";
+import { OpenRouterCard } from "./settings/OpenRouterCard.tsx";
 
 const AI_CHOICES: { value: AiProviderChoice; label: string; detail: string }[] = [
-  { value: "auto", label: "Automatic", detail: "Tries Claude first, then Codex" },
-  { value: "claude", label: "Claude only", detail: "Uses your Claude subscription" },
-  { value: "codex", label: "Codex only", detail: "Uses your ChatGPT subscription through Codex" },
+  {
+    value: "auto",
+    label: "Automatic",
+    detail: "Tries Claude Code, then Codex, then OpenRouter if you've saved a key",
+  },
+  { value: "claude", label: "Claude Code only", detail: "Uses your Claude subscription" },
+  { value: "codex", label: "Codex only", detail: "Uses your ChatGPT subscription" },
+  { value: "openrouter", label: "OpenRouter only", detail: "Pay as you go with your own key" },
 ];
+
+const LABELS: Record<AiProviderId, string> = {
+  claude: "Claude Code",
+  codex: "Codex",
+  openrouter: "OpenRouter",
+};
 
 const LOOKBACKS = [3, 6, 12, 24];
 
@@ -41,7 +57,7 @@ function SaveStatus({ status }: { status: SaveState }) {
 
 function useSaver(
   settings: ReturnType<typeof useLoad<AppSettings>>,
-): [SaveState, (patch: Partial<AppSettings>) => Promise<void>] {
+): [SaveState, (patch: Partial<AppSettings>) => Promise<boolean>] {
   const [status, setStatus] = useState<SaveState>({ state: "idle" });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -53,7 +69,7 @@ function useSaver(
 
   const save = async (patch: Partial<AppSettings>) => {
     const before = settings.data;
-    if (!before) return;
+    if (!before) return false;
     if (timer.current) clearTimeout(timer.current);
     settings.setData((current) => ({ ...current, ...patch }));
     setStatus({ state: "saving" });
@@ -62,12 +78,14 @@ function useSaver(
       settings.setData(() => saved);
       setStatus({ state: "saved" });
       timer.current = setTimeout(() => setStatus({ state: "idle" }), 2500);
+      return true;
     } catch (e) {
       settings.setData(() => before);
       setStatus({
         state: "error",
         message: e instanceof ApiError ? e.message : "Please try again.",
       });
+      return false;
     }
   };
   return [status, save];
@@ -105,8 +123,9 @@ function AiCheck() {
           <p class="hint callout success">
             <Icon name="check" class="hint-icon" />
             <span>
-              {check.data.label} answered in {(check.data.durationMs / 1000).toFixed(1)} seconds.
-              It's ready to sort your senders.
+              {check.data.label}
+              {check.data.model ? ` (${check.data.model})` : ""} answered in{" "}
+              {(check.data.durationMs / 1000).toFixed(1)} seconds. It's ready to sort your senders.
             </span>
           </p>
         )}
@@ -118,13 +137,127 @@ function AiCheck() {
   );
 }
 
+function InUse({
+  helpers,
+  checking,
+  note,
+  onCheckAgain,
+}: {
+  helpers: ReturnType<typeof useLoad<AiHelpersResponse>>;
+  checking: boolean;
+  note: { tone: "success" | "info" | "error"; text: string } | null;
+  onCheckAgain: () => void;
+}) {
+  const data = helpers.data;
+  return (
+    <div class="in-use">
+      {data === undefined && helpers.loading && (
+        <div class="in-use-row" role="status" aria-label="Checking your AI helpers">
+          <span class="skeleton skeleton-circle small" />
+          <span class="skeleton skeleton-text" style={{ width: "45%" }} />
+        </div>
+      )}
+      {data === undefined && helpers.error && (
+        <InlineError announce={false}>
+          Couldn't check which AI helpers are ready. {helpers.error}{" "}
+          <button type="button" class="button button-plain inline" onClick={helpers.retry}>
+            Try again
+          </button>
+        </InlineError>
+      )}
+      {data && (
+        <div class="in-use-row">
+          {data.inUse ? (
+            <>
+              <IconTile name="check" tone="success" size="sm" />
+              <span class="callout">
+                Using <strong>{LABELS[data.inUse]}</strong> now.
+              </span>
+            </>
+          ) : (
+            <>
+              <IconTile name="info" tone="neutral" size="sm" />
+              <span class="callout secondary">
+                No AI helper is ready yet, so senders are sorted with simple rules. Set one up
+                below.
+              </span>
+            </>
+          )}
+          <button
+            type="button"
+            class="button button-plain button-small in-use-check"
+            onClick={onCheckAgain}
+            disabled={checking}
+          >
+            <Icon name="refresh" size={14} />
+            {checking ? "Checking…" : "Check again"}
+          </button>
+        </div>
+      )}
+      <div aria-live="polite">
+        {note?.tone === "error" && <InlineError announce={false}>{note.text}</InlineError>}
+        {note && note.tone !== "error" && (
+          <Hint
+            icon={note.tone === "success" ? "check" : "info"}
+            tone={note.tone === "success" ? "success" : undefined}
+          >
+            {note.text}
+          </Hint>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function Settings() {
   const app = useApp();
   const settings = useLoad(() => api<AppSettings>("/api/settings"), "settings", app.version);
   const health = useLoad(() => api<HealthResponse>("/api/health"), "health", app.version);
+  const [helpersVersion, setHelpersVersion] = useState(0);
+  const helpers = useLoad(
+    () => api<AiHelpersResponse>("/api/ai/helpers"),
+    "ai-helpers",
+    app.version + helpersVersion,
+  );
   const [aiStatus, saveAi] = useSaver(settings);
+  const [modelStatus, saveModel] = useSaver(settings);
   const [lookbackStatus, saveLookback] = useSaver(settings);
+  const [checking, setChecking] = useState(false);
+  const [checkNote, setCheckNote] = useState<{
+    tone: "success" | "info" | "error";
+    text: string;
+  } | null>(null);
   const current = settings.data;
+
+  const checkAgain = async () => {
+    setChecking(true);
+    setCheckNote(null);
+    const before = new Map(helpers.data?.helpers.map((h) => [h.id, h.state]) ?? []);
+    try {
+      const fresh = await api<AiHelpersResponse>("/api/ai/helpers?refresh=1");
+      if (helpers.data) helpers.setData(() => fresh);
+      else helpers.retry();
+      const nowReady = fresh.helpers.filter(
+        (h) => h.state === "ready" && before.get(h.id) !== "ready",
+      );
+      if (nowReady.length > 0) {
+        const names = nowReady.map((h) => LABELS[h.id]).join(" and ");
+        app.toast(`${names} ${nowReady.length > 1 ? "are" : "is"} ready`, "success");
+      } else {
+        setCheckNote({
+          tone: "info",
+          text: "Nothing has changed yet. Finish the steps for a helper, then check again.",
+        });
+      }
+    } catch (e) {
+      setCheckNote({
+        tone: "error",
+        text: `Couldn't check again. ${e instanceof ApiError ? e.message : "Please try again."}`,
+      });
+    } finally {
+      setChecking(false);
+    }
+  };
 
   if (current === undefined) {
     if (settings.error) {
@@ -143,7 +276,7 @@ export function Settings() {
     return (
       <div class="stack" role="status" aria-label="Loading settings">
         <PageHeader title="Settings" />
-        {[1, 2].map((n) => (
+        {[1, 2, 3].map((n) => (
           <div class="card settings-group" key={n}>
             <span class="skeleton skeleton-text" style={{ width: "30%" }} />
             <span class="skeleton skeleton-text" style={{ width: "60%" }} />
@@ -153,6 +286,15 @@ export function Settings() {
       </div>
     );
   }
+
+  const stateOf = (id: AiProviderId): AiHelperState | null =>
+    helpers.data?.helpers.find((h) => h.id === id)?.state ?? null;
+  const needsSetup = (id: AiProviderId) =>
+    stateOf(id) === "not_installed" || stateOf(id) === "signed_out";
+  const firstToSetUp = (["claude", "codex"] as const).find(needsSetup);
+  const startOpen = (id: "claude" | "codex") =>
+    needsSetup(id) &&
+    (current.aiProvider === id || (helpers.data?.inUse === null && firstToSetUp === id));
 
   return (
     <div class="stack">
@@ -166,12 +308,15 @@ export function Settings() {
           <SaveStatus status={aiStatus} />
         </div>
         <p class="callout secondary">
-          Inbox Tidy uses an AI helper on your Mac to sort senders and suggest which ones to
-          unsubscribe from.
+          An AI helper sorts your senders and suggests which ones to unsubscribe from. Use your
+          Claude or ChatGPT subscription through Claude Code or Codex, or pay as you go with
+          OpenRouter.
         </p>
         <Hint icon="lock">
-          It only sees sender names and subject lines, never the emails themselves.
+          It only sees sender names, addresses, how many emails they send, and up to five subject
+          lines each. Never the emails themselves.
         </Hint>
+        <p class="subheading">Which helper to use</p>
         <div class="radio-list">
           {AI_CHOICES.map((choice) => (
             <label class="check-option" key={choice.value}>
@@ -179,7 +324,10 @@ export function Settings() {
                 type="radio"
                 name="ai-provider"
                 checked={current.aiProvider === choice.value}
-                onChange={() => saveAi({ aiProvider: choice.value })}
+                onChange={async () => {
+                  setCheckNote(null);
+                  if (await saveAi({ aiProvider: choice.value })) setHelpersVersion((n) => n + 1);
+                }}
               />
               <span>
                 {choice.label}
@@ -191,39 +339,32 @@ export function Settings() {
         {aiStatus.state === "error" && (
           <InlineError>Couldn't save your AI helper choice. {aiStatus.message}</InlineError>
         )}
-        <div class="availability">
-          {health.data === undefined && health.loading && (
-            <span class="skeleton skeleton-text" style={{ width: "45%" }} />
-          )}
-          {health.data === undefined && health.error && (
-            <InlineError announce={false}>
-              Couldn't check which AI helpers are installed. {health.error}{" "}
-              <button type="button" class="button button-plain inline" onClick={health.retry}>
-                Try again
-              </button>
-            </InlineError>
-          )}
-          {health.data && (
-            <ul class="plain-list callout availability-list">
-              {health.data.ai.providers.map((p) => (
-                <li key={p.id} class="hint">
-                  <Icon
-                    name={p.available ? "check" : "skip"}
-                    class={`hint-icon ${p.available ? "success" : "secondary"}`}
-                  />
-                  <span>
-                    {p.label}:{" "}
-                    <span class={p.available ? "success" : "secondary"}>
-                      {p.available ? "installed" : "not found on this Mac"}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <InUse helpers={helpers} checking={checking} note={checkNote} onCheckAgain={checkAgain} />
         <AiCheck />
       </section>
+
+      <CliHelperCard
+        id="claude"
+        state={stateOf("claude")}
+        startOpen={startOpen("claude")}
+        checking={checking}
+        onCheckAgain={checkAgain}
+      />
+      <CliHelperCard
+        id="codex"
+        state={stateOf("codex")}
+        startOpen={startOpen("codex")}
+        checking={checking}
+        onCheckAgain={checkAgain}
+      />
+      <OpenRouterCard
+        model={current.openRouterModel}
+        savingModel={modelStatus.state === "saving"}
+        modelSaved={modelStatus.state === "saved"}
+        modelError={modelStatus.state === "error" ? modelStatus.message : null}
+        onPickModel={(id) => saveModel({ openRouterModel: id })}
+        onKeyChanged={() => setHelpersVersion((n) => n + 1)}
+      />
 
       <section class="card settings-group" aria-labelledby="lookback-heading">
         <div class="setting-heading">

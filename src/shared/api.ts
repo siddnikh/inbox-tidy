@@ -1,8 +1,19 @@
 // The single contract between the UI (src/ui) and the core (src/core).
 // Every /api route returns either the documented payload or ApiErrorBody with a non-2xx status.
 
-export type AiProviderChoice = "auto" | "claude" | "codex";
-export type AiProviderId = "claude" | "codex";
+export type AiProviderChoice = "auto" | "claude" | "codex" | "openrouter";
+export type AiProviderId = "claude" | "codex" | "openrouter";
+
+// ready: usable now. signed_out: the CLI is installed but not signed in. not_installed: the CLI
+// wasn't found. needs_key: no OpenRouter key is saved. unknown: the CLI is installed, but the
+// sign-in check gave no clear answer.
+export type AiHelperState = "ready" | "signed_out" | "not_installed" | "needs_key" | "unknown";
+
+export interface AiHelperStatus {
+  id: AiProviderId;
+  label: string;
+  state: AiHelperState;
+}
 
 export interface ApiErrorBody {
   error: {
@@ -18,18 +29,73 @@ export interface HealthResponse {
   ok: boolean;
   version: string;
   database: { ok: boolean; schemaVersion: number };
-  ai: {
-    choice: AiProviderChoice;
-    providers: { id: AiProviderId; label: string; available: boolean }[];
-  };
+  ai: AiHelpersResponse;
 }
 
-// POST /api/ai/check
+// GET /api/ai/helpers[?refresh=1] -> AiHelpersResponse. Sign-in is detected with the CLIs' own
+// status commands, without sending an AI request. Results are cached briefly; refresh skips the
+// cache and looks again for newly installed CLIs.
+export interface AiHelpersResponse {
+  choice: AiProviderChoice;
+  // The helper the next request goes to first: the first ready (or unknown) helper in the chosen
+  // order, or null when none is.
+  inUse: AiProviderId | null;
+  helpers: AiHelperStatus[];
+}
+
+// POST /api/ai/check -> AiCheckResponse: a real, tiny round trip through the chosen order.
 export interface AiCheckResponse {
   provider: AiProviderId;
   label: string;
+  // The OpenRouter model that answered; null for the CLIs.
+  model: string | null;
   reply: string;
   durationMs: number;
+}
+
+// GET /api/ai/openrouter -> OpenRouterStatus
+// PUT /api/ai/openrouter/key (SaveOpenRouterKeyRequest) -> OpenRouterStatus: saves the key to the
+//   Keychain, replacing any saved key.
+// DELETE /api/ai/openrouter/key -> OpenRouterStatus
+// The key itself is never returned, only its last four characters.
+export interface OpenRouterStatus {
+  hasKey: boolean;
+  keyEnding: string | null;
+  model: string;
+  defaultModel: string;
+}
+
+export interface SaveOpenRouterKeyRequest {
+  key: string;
+}
+
+// POST /api/ai/openrouter/key/check -> OpenRouterKeyCheck. Asks OpenRouter about the saved key,
+// which costs nothing. A rejected or unreachable key returns ApiErrorBody instead.
+export interface OpenRouterKeyCheck {
+  // A plain sentence such as "Your key works."
+  message: string;
+  // False when the account has never bought credit, so paid models will refuse.
+  hasCredit: boolean;
+  // Dollars left under the key's own spending limit, when it has one.
+  limitRemaining: number | null;
+}
+
+// GET /api/ai/openrouter/models -> OpenRouterModelsResponse: models that can return answers in a
+// fixed JSON format through chat completions. The core caches the list for an hour.
+export interface OpenRouterModel {
+  id: string;
+  name: string;
+  // US dollars per million tokens; null when OpenRouter lists no price.
+  promptPerMillion: number | null;
+  completionPerMillion: number | null;
+  recommended: boolean;
+  // A short plain-language note, only on recommended models.
+  note: string | null;
+}
+
+export interface OpenRouterModelsResponse {
+  models: OpenRouterModel[];
+  defaultModel: string;
 }
 
 export type MailProviderId = "gmail" | "icloud" | "yahoo" | "rediffmail_pro" | "other";
@@ -199,4 +265,6 @@ export interface ActionsResponse {
 export interface AppSettings {
   aiProvider: AiProviderChoice;
   lookbackMonths: number;
+  // The OpenRouter model id, such as "openai/gpt-6-luna".
+  openRouterModel: string;
 }

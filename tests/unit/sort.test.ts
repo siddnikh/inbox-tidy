@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { AiUnavailableError } from "../../src/core/ai/cli.ts";
+import { AiUnavailableError } from "../../src/core/ai/client.ts";
 import type { AppContext } from "../../src/core/context.ts";
 import { getSender, loadSenderRows } from "../../src/core/insights/senders.ts";
 import {
@@ -133,7 +133,9 @@ describe("sortSenders", () => {
     let calls = 0;
     const ai = scriptedAi(() => {
       calls++;
-      throw new AiUnavailableError("Claude is not installed");
+      throw new AiUnavailableError([
+        { provider: "claude", detail: "not installed", userMessage: null },
+      ]);
     });
     const ctx = testContext({ ai });
     const account = addAccount(ctx);

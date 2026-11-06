@@ -12,6 +12,11 @@ export function resolveSearchPath(): Promise<string> {
   return cached;
 }
 
+// A CLI installed after launch may have added a directory to the login shell's PATH.
+export function resetSearchPath(): void {
+  cached = null;
+}
+
 async function computeSearchPath(): Promise<string> {
   const home = homedir();
   const parts = [

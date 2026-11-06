@@ -1,4 +1,4 @@
-import type { AiClient, AskOptions } from "../../src/core/ai/cli.ts";
+import type { AiClient, AskOptions } from "../../src/core/ai/client.ts";
 import type { AppContext } from "../../src/core/context.ts";
 import type { UnsubscribeMethod } from "../../src/shared/api.ts";
 
@@ -113,9 +113,10 @@ export function scriptedAi(
   const calls: RecordedCall[] = [];
   return {
     calls,
-    availability: async () => [
-      { id: "claude", label: "Claude", available: true, path: "/fake/claude" },
-      { id: "codex", label: "Codex", available: false, path: null },
+    status: async () => [
+      { id: "claude", label: "Claude Code", state: "ready" },
+      { id: "codex", label: "Codex", state: "not_installed" },
+      { id: "openrouter", label: "OpenRouter", state: "needs_key" },
     ],
     ask: async (prompt, options) => {
       calls.push({ prompt, options });

@@ -1,39 +1,25 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AiProviderChoice, AiProviderId } from "../../shared/api.ts";
-import { resolveSearchPath } from "./shell-path.ts";
+import type { AiHelperState } from "../../shared/api.ts";
+import type { AskOptions } from "./client.ts";
+import { resetSearchPath, resolveSearchPath } from "./shell-path.ts";
 
-export const PROVIDER_LABELS: Record<AiProviderId, string> = {
-  claude: "Claude",
-  codex: "Codex",
-};
+export type CliId = "claude" | "codex";
+export const CLI_IDS: CliId[] = ["claude", "codex"];
 
-export interface ProviderAvailability {
-  id: AiProviderId;
-  label: string;
-  available: boolean;
+export interface CliStatus {
+  id: CliId;
+  state: AiHelperState;
   path: string | null;
 }
 
-export interface AiReply {
-  provider: AiProviderId;
-  text: string;
-  durationMs: number;
+export interface CliRunner {
+  status(options?: { refresh?: boolean }): Promise<CliStatus[]>;
+  // Finds the CLI on the search path without checking sign-in; null when it isn't installed.
+  locate(id: CliId): Promise<string | null>;
+  ask(id: CliId, bin: string, prompt: string, options: AskOptions): Promise<string>;
 }
-
-export interface AskOptions {
-  timeoutMs?: number;
-  // JSON Schema the reply must satisfy. When given, text is the JSON string.
-  jsonSchema?: object;
-}
-
-export interface AiClient {
-  availability(): Promise<ProviderAvailability[]>;
-  ask(prompt: string, options?: AskOptions): Promise<AiReply>;
-}
-
-export class AiUnavailableError extends Error {}
 
 // Variables a parent Claude Code session sets; inheriting them makes a child `claude -p`
 // behave as a nested session. ANTHROPIC_API_KEY is dropped so the user's subscription login is used.
@@ -50,11 +36,8 @@ const STRIPPED_ENV = [
   "ANTHROPIC_API_KEY",
 ];
 
-export function providerOrder(choice: AiProviderChoice): AiProviderId[] {
-  if (choice === "claude") return ["claude"];
-  if (choice === "codex") return ["codex"];
-  return ["claude", "codex"];
-}
+const STATUS_TIMEOUT_MS = 10_000;
+const STATUS_CACHE_MS = 30_000;
 
 async function childEnv(): Promise<Record<string, string>> {
   const env: Record<string, string> = {};
@@ -67,14 +50,14 @@ async function childEnv(): Promise<Record<string, string>> {
 
 async function run(
   cmd: string[],
-  input: string,
+  input: string | null,
   cwd: string,
   timeoutMs: number,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const proc = Bun.spawn(cmd, {
     cwd,
     env: await childEnv(),
-    stdin: new Blob([input]),
+    stdin: input === null ? "ignore" : new Blob([input]),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -91,6 +74,39 @@ async function run(
   clearTimeout(timer);
   if (timedOut) throw new Error(`timed out after ${Math.round(timeoutMs / 1000)} seconds`);
   return { code, stdout, stderr };
+}
+
+// `claude auth status` prints JSON with `loggedIn` and exits 1 when signed out.
+export function parseClaudeAuthStatus(code: number, stdout: string): AiHelperState {
+  try {
+    const parsed = JSON.parse(stdout) as { loggedIn?: unknown };
+    if (parsed.loggedIn === true) return "ready";
+    if (parsed.loggedIn === false) return "signed_out";
+  } catch {
+    // Older versions may not have the subcommand; fall through.
+  }
+  return code === 0 ? "unknown" : "signed_out";
+}
+
+// `codex login status` prints "Logged in using ChatGPT" (or "... an API key") to stderr and
+// exits 0, or prints "Not logged in" and exits 1.
+export function parseCodexLoginStatus(code: number, output: string): AiHelperState {
+  if (/not logged in/i.test(output)) return "signed_out";
+  if (code === 0 && /logged in/i.test(output)) return "ready";
+  return code === 0 ? "unknown" : "signed_out";
+}
+
+async function signInState(id: CliId, bin: string): Promise<AiHelperState> {
+  const cmd = id === "claude" ? [bin, "auth", "status"] : [bin, "login", "status"];
+  try {
+    const { code, stdout, stderr } = await run(cmd, null, tmpdir(), STATUS_TIMEOUT_MS);
+    return id === "claude"
+      ? parseClaudeAuthStatus(code, stdout)
+      : parseCodexLoginStatus(code, `${stdout}\n${stderr}`);
+  } catch (error) {
+    console.error(`Checking ${id} sign-in failed: ${(error as Error).message}`);
+    return "unknown";
+  }
 }
 
 async function askClaude(bin: string, prompt: string, options: AskOptions, cwd: string) {
@@ -160,42 +176,46 @@ async function askCodex(bin: string, prompt: string, options: AskOptions, cwd: s
   return text;
 }
 
-export function cliAiClient(getChoice: () => AiProviderChoice): AiClient {
-  async function availability(): Promise<ProviderAvailability[]> {
-    const PATH = await resolveSearchPath();
-    return (["claude", "codex"] as const).map((id) => {
-      const path = Bun.which(id, { PATH });
-      return { id, label: PROVIDER_LABELS[id], available: path !== null, path };
-    });
+export function cliRunner(): CliRunner {
+  let cached: { at: number; value: Promise<CliStatus[]> } | null = null;
+
+  async function locate(id: CliId): Promise<string | null> {
+    return Bun.which(id, { PATH: await resolveSearchPath() });
   }
 
-  async function ask(prompt: string, options: AskOptions = {}): Promise<AiReply> {
-    const found = await availability();
-    const order = providerOrder(getChoice());
-    const failures: string[] = [];
-    for (const id of order) {
-      const provider = found.find((p) => p.id === id);
-      if (!provider?.path) {
-        failures.push(`${PROVIDER_LABELS[id]} is not installed`);
-        continue;
+  async function compute(): Promise<CliStatus[]> {
+    return Promise.all(
+      CLI_IDS.map(async (id): Promise<CliStatus> => {
+        const path = await locate(id);
+        if (!path) return { id, state: "not_installed", path: null };
+        return { id, state: await signInState(id, path), path };
+      }),
+    );
+  }
+
+  return {
+    locate,
+    status({ refresh = false } = {}) {
+      if (refresh) resetSearchPath();
+      if (refresh || !cached || Date.now() - cached.at > STATUS_CACHE_MS) {
+        const value = compute();
+        cached = { at: Date.now(), value };
+        value.catch(() => {
+          if (cached?.value === value) cached = null;
+        });
       }
+      return cached.value;
+    },
+    async ask(id, bin, prompt, options) {
       // A scratch working directory keeps the CLIs away from any project instructions.
       const cwd = mkdtempSync(join(tmpdir(), "inbox-tidy-ai-"));
-      const started = performance.now();
       try {
-        const text =
-          id === "claude"
-            ? await askClaude(provider.path, prompt, options, cwd)
-            : await askCodex(provider.path, prompt, options, cwd);
-        return { provider: id, text, durationMs: Math.round(performance.now() - started) };
-      } catch (error) {
-        failures.push(`${PROVIDER_LABELS[id]}: ${(error as Error).message}`);
+        return id === "claude"
+          ? await askClaude(bin, prompt, options, cwd)
+          : await askCodex(bin, prompt, options, cwd);
       } finally {
         rmSync(cwd, { recursive: true, force: true });
       }
-    }
-    throw new AiUnavailableError(failures.join("; "));
-  }
-
-  return { availability, ask };
+    },
+  };
 }

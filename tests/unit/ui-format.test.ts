@@ -7,6 +7,7 @@ import {
   inboxOverview,
   methodBadge,
   methodIcon,
+  modelPrice,
   monogram,
   monthlyRate,
   plural,
@@ -14,6 +15,7 @@ import {
   readShare,
   relativeTime,
   scanFraction,
+  sortCostEstimate,
   stepIcon,
 } from "../../src/ui/format.ts";
 
@@ -173,5 +175,34 @@ describe("visual cues", () => {
     expect(methodIcon("mailto")).toBe("mail");
     expect(methodIcon("web")).toBe("globe");
     expect(methodIcon("none")).toBe("skip");
+  });
+});
+
+describe("OpenRouter model prices", () => {
+  const model = (read: number | null, write: number | null) => ({
+    id: "a/b",
+    name: "A",
+    promptPerMillion: read,
+    completionPerMillion: write,
+    recommended: false,
+    note: null,
+  });
+
+  test("reads per million tokens in plain words", () => {
+    expect(modelPrice(model(0.1, 0.5))).toBe(
+      "$0.10 per million tokens read, $0.50 per million written",
+    );
+    expect(modelPrice(model(0.006, 6.8))).toBe(
+      "$0.006 per million tokens read, $6.80 per million written",
+    );
+    expect(modelPrice(model(0, 0))).toBe("Free");
+    expect(modelPrice(model(null, 1))).toBe("Price not listed");
+  });
+
+  test("estimates the cost of sorting 100 senders", () => {
+    expect(sortCostEstimate(model(0.1, 0.5))).toBe("Less than a cent to sort 100 senders");
+    expect(sortCostEstimate(model(2, 10))).toBe("About $0.10 to sort 100 senders");
+    expect(sortCostEstimate(model(0, 0))).toBeNull();
+    expect(sortCostEstimate(model(null, null))).toBeNull();
   });
 });

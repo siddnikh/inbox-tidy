@@ -13,25 +13,32 @@ Inbox Tidy.app
 └─ Contents/Resources/Inbox Tidy Helper  Bun core: API + UI + SQLite + IMAP/SMTP + AI CLI bridge
         │
         ├─ SQLite: ~/Library/Application Support/Inbox Tidy/inbox-tidy.sqlite
-        ├─ macOS Keychain (service "Inbox Tidy"): one item per mail account password
+        ├─ macOS Keychain (service "Inbox Tidy"): one item per mail account password, plus "openrouter-api-key"
         ├─ IMAP/SMTP over TLS → Gmail, iCloud, Yahoo, Rediffmail Pro, other
-        └─ `claude -p` / `codex exec` child processes → the user's AI subscriptions
+        ├─ `claude -p` / `codex exec` child processes → the user's AI subscriptions
+        └─ HTTPS → openrouter.ai (only with a saved key, plus its public model list)
 ```
 
 ### API access guard
 
 Every `/api` request must (1) target exactly `127.0.0.1:<port>` or `localhost:<port>`, which blocks DNS-rebinding pages, (2) carry the `inbox_tidy_session` HttpOnly SameSite=Strict cookie, which the shell obtains by loading `/session?t=<token>`, and (3) for writes, have a same-origin `Origin` header if one is present. The token is random per launch unless `INBOX_TIDY_TOKEN` is set (dev only).
 
-### AI bridge (`src/core/ai/cli.ts`)
+### AI bridge (`src/core/ai/`)
 
-- Providers are tried in order: `auto` means Claude, then Codex. The choice is stored in settings.
+- `client.ts` holds the `AiClient` interface (`status`, `ask`) and `createAiClient`, which tries helpers in `providerOrder`: `auto` means Claude Code, then Codex, then OpenRouter only when a key is saved (it bills per request). A single choice (`claude`, `codex`, `openrouter`) uses only that helper. The choice and the OpenRouter model id live in settings. A failed `ask` throws `AiUnavailableError` with one `AiFailure` per helper tried (log detail plus an optional plain `userMessage`).
+- `cli.ts` runs the CLIs. `openrouter.ts` talks to OpenRouter. `shell-path.ts` resolves the search path.
+- Status without spending a request: `claude auth status` prints JSON with `loggedIn` (exit 1 when signed out); `codex login status` prints "Logged in using ChatGPT" or "Not logged in" to stderr (exit 1 when signed out). Both run with the same stripped environment as real requests, so a stray `ANTHROPIC_API_KEY` doesn't count as signed in. States are `ready`, `signed_out`, `not_installed`, `unknown` (installed, unclear answer), and `needs_key` for OpenRouter. CLI status is cached for 30 s; `GET /api/ai/helpers?refresh=1` drops the cache and re-reads the login shell's `PATH`.
+- Setup commands shown in Settings (checked against the official docs on 2026-11-06): Claude Code installs with `curl -fsSL https://claude.ai/install.sh | bash` and Codex with `curl -fsSL https://chatgpt.com/codex/install.sh | sh`. Neither needs Homebrew or Node, and both put the CLI in `~/.local/bin`, so a fresh install signs in with `~/.local/bin/claude auth login` or `~/.local/bin/codex login` (an already-open Terminal doesn't search the new directory yet). An installed but signed-out CLI uses `claude auth login` or `codex login`.
 - Claude runs as `claude -p --output-format json --tools "" --no-session-persistence --strict-mcp-config --setting-sources "" --model sonnet [--json-schema <schema>]`, with the prompt on stdin. A structured reply arrives in `structured_output`. Do not use `--bare`, because it refuses subscription (OAuth) login.
 - Codex runs as `codex exec --sandbox read-only --skip-git-repo-check --ephemeral --color never -o <file> [--output-schema <file>] -`, with the prompt on stdin.
 - Each call runs in a fresh temporary directory, so no project instructions leak in. `ANTHROPIC_API_KEY` and parent Claude Code session variables are stripped, so the subscription is used.
 - Finder-launched apps get a minimal `PATH`. `src/core/ai/shell-path.ts` asks the user's interactive login shell (`$SHELL -ilc`) for its `PATH`, which is how nvm-installed `codex` (needing `node`) and `~/.local/bin/claude` are found.
-- A JSON schema passed to `ask` must suit both CLIs, so it follows OpenAI strict structured outputs, which Codex enforces. The top level is an object. Every object sets `additionalProperties: false` and lists all of its properties in `required`. Keywords such as `maxLength` and `format` are not used, so length limits are applied in code after validation. The sender-sorting schema is `SORT_SCHEMA` in `src/core/insights/sort.ts`.
-- Tests inject a fake `AiClient`; they must never spawn the real CLIs.
-- Moving to paid APIs later means adding another `AiClient` implementation. Nothing else changes.
+- A JSON schema passed to `ask` must suit every helper, so it follows OpenAI strict structured outputs, which Codex and OpenRouter's `strict: true` enforce. The top level is an object. Every object sets `additionalProperties: false` and lists all of its properties in `required`. Keywords such as `maxLength` and `format` are not used, so length limits are applied in code after validation. The sender-sorting schema is `SORT_SCHEMA` in `src/core/insights/sort.ts`, and `parseAiResults` there validates every reply against the fixed enums, whichever helper answered.
+- OpenRouter: `POST https://openrouter.ai/api/v1/chat/completions` with `Authorization: Bearer <key>`, the prompt as one user message, `stream: false`, `provider: { require_parameters: true }` (so only endpoints that honour the schema are used), and, with a schema, `response_format: { type: "json_schema", json_schema: { name, strict: true, schema } }`. Timeout 180 s. A reply is unusable unless it is non-empty and, with a schema, parses as JSON (a Markdown fence is stripped). Errors can arrive inside a 200 body (`error`, or `finish_reason: "error"`), so both are checked. `openRouterError` maps 401 to a bad key, 402 to no credit, 404 / 503 routing / 400 format messages to "model can't answer in the format", 400 "not a valid model" to an unknown model, 429 to rate limited, 408 / 504 / abort to timeout, other 5xx to unavailable, and fetch failures to offline. The plain `userMessage` is shown; the technical detail goes to the log only. Requests carry `HTTP-Referer` and `X-OpenRouter-Title: Inbox Tidy`.
+- The OpenRouter key lives only in the Keychain (same service, name `openrouter-api-key`). API responses expose `hasKey` and the last four characters. "Test key" calls `GET /api/v1/key`, which costs nothing, and reads `is_free_tier` (no credit bought yet) and `limit_remaining`.
+- The model list comes from the public `GET /api/v1/models?supported_parameters=structured_outputs` (no key), filtered again to text-output models served by chat completions (dropping `:batch` variants), with prices converted to dollars per million tokens (negative or missing prices become null). The core caches it for an hour and serves the stale copy when offline. The default model is `openai/gpt-6-luna`; the suggested list in `RECOMMENDED_MODELS` is GPT-6 Luna, Claude Haiku 5.5, DeepSeek V4.1 Flash, and Gemini 3.8 Flash, each checked on 2026-11-06 to support structured outputs. Model ids are validated with `MODEL_ID_PATTERN`; any id may be typed, so a model that later drops out of the list keeps working until OpenRouter refuses it.
+- The Settings cost estimate assumes 100 senders is about 18,000 tokens in and 6,000 out, measured from the sorting prompt with five subjects per sender. Thinking models use more.
+- Tests inject a fake `AiClient`, or a fake `CliRunner` and `OpenRouterClient`, and every test context gets a `fetch` that refuses the network. They must never spawn the real CLIs or reach OpenRouter.
 
 ### Mail access
 
@@ -73,7 +80,7 @@ Every `/api` request must (1) target exactly `127.0.0.1:<port>` or `localhost:<p
 ```text
 shell/              native window source, Info.plist template, app icon (icon/*.svg → AppIcon.icns)
 src/core/           Bun core
-  ai/               AI CLI bridge and PATH resolution
+  ai/               AI helpers: client (order, status), CLI bridge, OpenRouter, PATH resolution
   db/               SQLite open and migrations
   mail/             IMAP/SMTP, provider presets, scanning
   insights/         sender statistics and AI categorisation
@@ -99,7 +106,7 @@ README screenshots (`docs/screenshots/*.png`) are captured from the real UI in h
 - macOS 13 or later on Apple Silicon, with Xcode Command Line Tools (`xcode-select --install`). `clang` is required.
 - Bun 1.3 or later (`curl -fsSL https://bun.sh/install | bash`).
 - Docker through Colima (`brew install colima docker docker-compose && colima start`), needed only for integration tests and QA.
-- The `claude` CLI signed in to a Claude subscription and, optionally, the `codex` CLI signed in to ChatGPT. Run each once interactively to sign in.
+- An AI helper, optional: the `claude` CLI signed in to a Claude subscription (`claude auth login`), the `codex` CLI signed in to ChatGPT (`codex login`), or an OpenRouter key saved in Settings. Without one, sorting uses the rule-based fallback.
 
 ## Commands
 
@@ -143,7 +150,7 @@ No env file is used or committed. All variables are optional.
 | `INBOX_TIDY_DATA_DIR` | `~/Library/Application Support/Inbox Tidy` (`… Inbox Tidy Dev` in dev) | SQLite location |
 | `INBOX_TIDY_PORT` | `0` (random) | Core port |
 | `INBOX_TIDY_TOKEN` | random | Fixed session token (dev only) |
-| `INBOX_TIDY_AI_PROVIDER` | `auto` | Default AI choice until changed in settings |
+| `INBOX_TIDY_AI_PROVIDER` | `auto` | Default AI choice (`auto`, `claude`, `codex`, `openrouter`) until changed in settings |
 | `INBOX_TIDY_LOOKBACK_MONTHS` | `12` | Default scan window until changed in settings |
 | `INBOX_TIDY_KEYCHAIN_SERVICE` | `Inbox Tidy` (`Inbox Tidy Dev` in dev) | Keychain service for passwords; QA must use its own |
 | `INBOX_TIDY_DEV` | unset | `1` enables HMR and dev defaults |
@@ -151,13 +158,14 @@ No env file is used or committed. All variables are optional.
 
 ## Remote dependencies
 
-The only remote services contacted at runtime are the user's mail providers, the AI providers through the user's own CLIs, and unsubscribe endpoints chosen by senders.
+The only remote services contacted at runtime are the user's mail providers, the AI providers through the user's own CLIs, OpenRouter (its public model list while Settings is open, and requests once a key is saved), and unsubscribe endpoints chosen by senders.
 
 ## Troubleshooting
 
 - **"Inbox Tidy stopped working in the background."** Read `~/Library/Logs/Inbox Tidy/core.log`.
 - **The AI helper isn't found when the app is opened from Finder, but works in Terminal.** The login-shell `PATH` lookup failed. Check that `zsh -ilc 'echo $PATH'` includes the CLI's directory.
-- **The AI check fails with an auth error.** Run `claude` (or `codex`) once in Terminal to sign in.
+- **The AI check fails with an auth error.** Settings shows the helper as "Installed, not signed in"; run `claude auth login` (or `codex login`) in Terminal, then press Check again.
+- **OpenRouter says a model "can't answer in the format Inbox Tidy needs".** No endpoint for that model supports structured outputs right now. Pick a suggested model.
 - **A Keychain prompt appears after rebuilding the app.** Ad-hoc signatures change with every build. Choose "Always Allow".
 - **The Swift error "this SDK is not supported by the compiler" appears.** The shell build doesn't use Swift; reinstall the Command Line Tools if `clang` itself fails.
 - **`make infra-up` hangs.** Run `colima start`, then retry.
