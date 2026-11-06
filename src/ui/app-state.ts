@@ -11,6 +11,8 @@ export interface AppState {
   refresh: () => void;
   toast: (message: string, tone?: ToastTone) => void;
   scan: ScanStatus | null;
+  // True while status polls are failing, so progress displays can say they may be stale.
+  scanTrouble: boolean;
   startScan: () => Promise<void>;
   watchScan: () => void;
   navigate: (tab: Tab) => void;

@@ -33,6 +33,7 @@ export interface ReadProgress {
 interface ScanRun {
   status: ScanStatus;
   promise: Promise<ScanStatus> | null;
+  queued: boolean;
 }
 
 const runs = new WeakMap<AppContext, ScanRun>();
@@ -54,7 +55,7 @@ function idleStatus(): ScanStatus {
 function runFor(ctx: AppContext): ScanRun {
   let run = runs.get(ctx);
   if (!run) {
-    run = { status: idleStatus(), promise: null };
+    run = { status: idleStatus(), promise: null, queued: false };
     runs.set(ctx, run);
   }
   return run;
@@ -64,18 +65,29 @@ export function scanStatus(ctx: AppContext): ScanStatus {
   return structuredClone(runFor(ctx).status);
 }
 
-// Starts a background scan of every account, or returns the running one's status.
+// Starts a background scan of every account. Asking while one runs queues one more full pass
+// after it, so an account added mid-scan is never skipped.
 export function startScan(ctx: AppContext): ScanStatus {
   const run = runFor(ctx);
-  if (run.promise) return scanStatus(ctx);
-  run.status = {
-    ...idleStatus(),
-    state: "running",
-    stage: "connecting",
-    message: "Getting ready to read your email…",
-    startedAt: new Date().toISOString(),
-  };
-  run.promise = runScan(ctx, run).finally(() => {
+  if (run.promise) {
+    run.queued = true;
+    return scanStatus(ctx);
+  }
+  run.promise = (async () => {
+    let last: ScanStatus;
+    do {
+      run.queued = false;
+      run.status = {
+        ...idleStatus(),
+        state: "running",
+        stage: "connecting",
+        message: "Getting ready to read your email…",
+        startedAt: new Date().toISOString(),
+      };
+      last = await runScan(ctx, run);
+    } while (run.queued);
+    return last;
+  })().finally(() => {
     run.promise = null;
   });
   return scanStatus(ctx);

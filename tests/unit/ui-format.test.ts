@@ -150,6 +150,7 @@ describe("scan fraction", () => {
     expect(scanFraction(base)).toBe(0.3);
     expect(scanFraction({ ...base, processed: 5000 })).toBe(1);
     expect(scanFraction({ ...base, total: 0 })).toBeNull();
+    expect(scanFraction({ ...base, processed: 0 })).toBeNull();
   });
 });
 

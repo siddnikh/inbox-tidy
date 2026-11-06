@@ -9,7 +9,7 @@ const NOW = Date.now();
 
 test("summary is all zeros before anything is connected", () => {
   const ctx = testContext();
-  expect(homeSummary(ctx, NOW)).toEqual({
+  expect(homeSummary(ctx, { now: NOW })).toEqual({
     impact: { sendersUnsubscribed: 0, emailsAvoidedPerMonth: 0, emailsTrashed: 0 },
     inbox: {
       accounts: 0,
@@ -80,7 +80,7 @@ test("summary counts impact from the latest actions and the inbox over the windo
   const friend = addSender(ctx, { address: "pal@friend.example" });
   addMessages(ctx, first, friend, [{ daysAgo: 2, read: true }], NOW);
 
-  const summary = homeSummary(ctx, NOW);
+  const summary = homeSummary(ctx, { now: NOW });
   expect(summary.impact).toEqual({
     sendersUnsubscribed: 2,
     emailsAvoidedPerMonth: 16,
@@ -100,6 +100,47 @@ test("summary counts impact from the latest actions and the inbox over the windo
   expect(summary.lookbackMonths).toBe(12);
 });
 
+test("summary for one account covers only that account's emails and impact", () => {
+  const ctx = testContext();
+  const work = addAccount(ctx, "work@example.test", "2026-11-02T10:00:00.000Z");
+  const home = addAccount(ctx, "home@example.test", "2026-11-05T09:00:00.000Z");
+
+  const shared = addSender(ctx, { address: "news@shared.example", method: "one_click" });
+  addMessages(ctx, work, shared, [{ daysAgo: 1 }, { daysAgo: 2, trashed: true }], NOW);
+  addMessages(ctx, home, shared, [{ daysAgo: 3 }, { daysAgo: 4 }], NOW);
+  addAction(ctx, {
+    senderId: shared,
+    kind: "unsubscribe",
+    status: "done",
+    emailsPerMonthBefore: 20,
+  });
+
+  const homeOnly = addSender(ctx, {
+    address: "deals@shop.example",
+    method: "one_click",
+    recommendation: "unsubscribe",
+  });
+  addMessages(ctx, home, homeOnly, [{ daysAgo: 5 }, { daysAgo: 6, read: true }], NOW);
+
+  const forWork = homeSummary(ctx, { accountId: work, now: NOW });
+  expect(forWork.impact).toEqual({
+    sendersUnsubscribed: 1,
+    emailsAvoidedPerMonth: 10,
+    emailsTrashed: 1,
+  });
+  expect(forWork.inbox).toMatchObject({ accounts: 2, totalEmails: 1, senders: 1, suggested: 0 });
+  expect(forWork.lastScanAt).toBe("2026-11-02T10:00:00.000Z");
+
+  const forHome = homeSummary(ctx, { accountId: home, now: NOW });
+  expect(forHome.impact).toEqual({
+    sendersUnsubscribed: 1,
+    emailsAvoidedPerMonth: 10,
+    emailsTrashed: 0,
+  });
+  expect(forHome.inbox).toMatchObject({ totalEmails: 4, senders: 2, suggested: 1 });
+  expect(forHome.lastScanAt).toBe("2026-11-05T09:00:00.000Z");
+});
+
 let app: TestApp;
 afterEach(() => app?.stop());
 
@@ -112,4 +153,22 @@ test("GET /api/summary returns the home summary", async () => {
   const body = (await res.json()) as HomeSummary;
   expect(body.inbox.accounts).toBe(1);
   expect(body.lookbackMonths).toBe(6);
+});
+
+test("GET /api/summary and /api/senders accept an account and reject unknown ones", async () => {
+  app = startTestApp();
+  const work = addAccount(app.ctx, "work@example.test");
+  const home = addAccount(app.ctx, "home@example.test");
+  const sender = addSender(app.ctx, { address: "news@shop.example" });
+  addMessages(app.ctx, home, sender, [{ daysAgo: 1 }], NOW);
+
+  const summary = (await (await app.call(`/api/summary?account=${home}`)).json()) as HomeSummary;
+  expect(summary.inbox.totalEmails).toBe(1);
+  const workSenders = (await (await app.call(`/api/senders?account=${work}`)).json()) as unknown[];
+  expect(workSenders).toEqual([]);
+  const homeSenders = (await (await app.call(`/api/senders?account=${home}`)).json()) as unknown[];
+  expect(homeSenders).toHaveLength(1);
+
+  expect((await app.call("/api/summary?account=999")).status).toBe(404);
+  expect((await app.call("/api/senders?account=abc")).status).toBe(400);
 });

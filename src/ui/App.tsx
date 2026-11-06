@@ -175,6 +175,7 @@ export function App() {
     refresh,
     toast,
     scan,
+    scanTrouble: pollTrouble,
     startScan,
     watchScan,
     navigate,
@@ -218,7 +219,7 @@ export function App() {
             idPrefix="tab"
           />
         </nav>
-        {scan?.state === "running" && (
+        {scan?.state === "running" && tab !== "home" && (
           <div class="header-inner">
             <ScanProgress scan={scan} trouble={pollTrouble} />
           </div>

@@ -10,6 +10,17 @@ import {
   setKept,
 } from "../insights/senders.ts";
 import { homeSummary } from "../insights/summary.ts";
+import { getAccount } from "../mail/connection.ts";
+
+function accountParam(params: URLSearchParams, ctx: AppContext): number | undefined {
+  const raw = params.get("account");
+  if (!raw) return undefined;
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new HttpError(400, "Inbox Tidy asked for an account it doesn't know. Please try again.");
+  }
+  return getAccount(ctx, id).id;
+}
 
 function keep(kept: boolean) {
   return (req: BunRequest, ctx: AppContext) => {
@@ -20,7 +31,10 @@ function keep(kept: boolean) {
 }
 
 export const insightRoutes: RouteTable = {
-  "/api/summary": { GET: (_req, ctx) => json(homeSummary(ctx)) },
+  "/api/summary": {
+    GET: (req, ctx) =>
+      json(homeSummary(ctx, { accountId: accountParam(new URL(req.url).searchParams, ctx) })),
+  },
   "/api/senders": {
     GET: (req, ctx) => {
       const params = new URL(req.url).searchParams;
@@ -37,6 +51,7 @@ export const insightRoutes: RouteTable = {
       }
       return json(
         listSenders(ctx, {
+          accountId: accountParam(params, ctx),
           filter: filter as SenderFilter,
           sort: sort as SenderSort,
           q: params.get("q") ?? "",
