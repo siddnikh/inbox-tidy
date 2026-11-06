@@ -28,8 +28,10 @@ function readInt(env: Env, name: string, fallback: number, min: number, max: num
 
 function readProvider(env: Env): AiProviderChoice {
   const raw = env.INBOX_TIDY_AI_PROVIDER ?? "auto";
-  if (raw === "auto" || raw === "claude" || raw === "codex") return raw;
-  throw new ConfigError(`INBOX_TIDY_AI_PROVIDER must be auto, claude, or codex, got "${raw}"`);
+  if (raw === "auto" || raw === "claude" || raw === "codex" || raw === "openrouter") return raw;
+  throw new ConfigError(
+    `INBOX_TIDY_AI_PROVIDER must be auto, claude, codex, or openrouter, got "${raw}"`,
+  );
 }
 
 export function loadConfig(env: Env = process.env): Config {

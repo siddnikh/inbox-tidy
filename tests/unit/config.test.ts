@@ -19,7 +19,9 @@ describe("loadConfig", () => {
 
   test("rejects invalid values with a readable message", () => {
     expect(() => loadConfig({ INBOX_TIDY_PORT: "abc" })).toThrow(ConfigError);
-    expect(() => loadConfig({ INBOX_TIDY_AI_PROVIDER: "gpt" })).toThrow(/auto, claude, or codex/);
+    expect(() => loadConfig({ INBOX_TIDY_AI_PROVIDER: "gpt" })).toThrow(
+      /auto, claude, codex, or openrouter/,
+    );
     expect(() => loadConfig({ INBOX_TIDY_LOOKBACK_MONTHS: "0" })).toThrow(ConfigError);
   });
 });

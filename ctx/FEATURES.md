@@ -7,7 +7,7 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 - **Status:** Built
 - **Problem and outcome:** The user double-clicks Inbox Tidy and gets a native Mac window that works without any setup in Terminal.
 - **Journey:** Open from Applications, see "Opening Inbox Tidy…", and then the app's screens load. Quitting the window stops everything in the background.
-- **Built now:** The native shell, the bundled core, the session guard, `GET /api/health` (database and AI tool availability), `POST /api/ai/check` (a real one-word round trip through Claude, falling back to Codex), and `GET`/`PUT /api/settings`. The starter screen has been replaced by the full UI (see features 2 to 8), which talks to the routes in `src/shared/api.ts`.
+- **Built now:** The native shell, the bundled core, the session guard, `GET /api/health` (database and AI helper status), `POST /api/ai/check` (a real one-word round trip through the chosen AI helper order, feature 8), and `GET`/`PUT /api/settings`. The starter screen has been replaced by the full UI (see features 2 to 8), which talks to the routes in `src/shared/api.ts`.
 - **Edge cases:** A missing core binary, a core that never becomes ready (20 s), and a core that crashes each show a plain-language page in the window pointing to the log.
 
 ## 2. Connect email accounts
@@ -139,15 +139,19 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 ## 8. Settings
 
 - **Status:** Built
-- **Problem and outcome:** The user can choose which AI helper is used and how far back to look.
-- **Built now:** `GET`/`PUT /api/settings`, with validation and persistence.
-- **Built now (UI):** The Settings tab: an AI helper choice (Automatic, which tries Claude and then Codex, or Claude only, or Codex only) saved immediately with a "Saved" confirmation, availability of each helper, "Test the AI helper", a lookback choice (3, 6, 12, or 24 months), and the app version. Connected accounts and Remove live on the Accounts tab.
+- **Problem and outcome:** The user can connect an AI helper without touching code or reading developer docs (Claude Code or Codex through their subscription, or OpenRouter with their own key and a model they pick), choose which one is used, and choose how far back to look.
+- **Built now (core):** `GET`/`PUT /api/settings` (`aiProvider` is `auto`, `claude`, `codex`, or `openrouter`; `openRouterModel` must look like `vendor/model`; unknown keys are ignored). `GET /api/ai/helpers[?refresh=1]` returns each helper's state and the helper in use, detecting sign-in with `claude auth status` and `codex login status`, without an AI request. `POST /api/ai/check` sends a tiny schema-checked request through the chosen order and returns the helper, the OpenRouter model if used, and the time taken; a single failing helper's plain reason (such as "out of credit") is returned as the error. OpenRouter: `GET /api/ai/openrouter` (`hasKey`, last four characters, model, default), `PUT` and `DELETE /api/ai/openrouter/key` (Keychain only; the key is never returned), `POST /api/ai/openrouter/key/check` (free key check), and `GET /api/ai/openrouter/models` (models with structured outputs, prices per million tokens, suggested ones first, cached for an hour, a plain 503 offline).
+- **Built now (UI):** The Settings tab, in this order:
+  - **AI helper.** What the helper does and what it sees, the choice (Automatic: Claude Code, then Codex, then OpenRouter if a key is saved; or one helper only) saved at once with "Saved", a line saying which helper is in use ("Using Claude Code now", or that none is ready and simple rules are used), "Check again" (re-reads the CLIs, toasts "Claude Code is ready" when one becomes ready, or says nothing changed), and "Test the AI helper".
+  - **Claude Code and Codex cards.** Each shows Ready, Installed, not signed in, Not installed, or Installed (unclear sign-in). When setup is needed, "Show me how" opens numbered visual steps: open Terminal (Command and Space, type Terminal, Return), paste the install line, paste the sign-in line (the browser opens to sign in), and come back to press Check again. Every line to paste has a Copy button that turns into "Copied". A link opens the official setup guide. Steps start open for the chosen helper, or for the first one needing setup when none is ready.
+  - **OpenRouter card.** Ready or No key yet. Plain privacy copy (the same sender details go to OpenRouter and the model's provider) and billing copy (usage is billed to the user's OpenRouter account). Without a key: four visual steps with links to the keys and credits pages, then a password field with Show/Hide and "Save key" ("Saving…", toast "Saved your OpenRouter key", then an automatic key check). With a key: "ending in …abcd", Test key, Replace key, and Remove key (a confirmation sheet, then toast "Removed your OpenRouter key"). The model block shows the current model's name, note, price per million tokens read and written, and a rough cost to sort 100 senders, with "Choose a different model" opening a searchable list (suggested first, then all) and a free-text model ID field. Offline, the list shows an error with Try again while the ID field still works.
+  - **How far back to look** (3, 6, 12, or 24 months) and the app version.
+- **Edge cases:** An empty or partial key is refused before saving and the typed text is kept. A key OpenRouter rejects is reported by the check right after saving ("Create a new key on openrouter.ai…"), and Replace key swaps it. A key on an account with no credit "works, but has no credit yet" with an Add credit link. A model OpenRouter no longer lists stays selected and shows that its price is unknown. Connected accounts and Remove live on the Accounts tab.
 
 ## Future ideas (not committed)
 
 - POP3 read-only support for free Rediffmail accounts.
 - Google sign-in (OAuth) instead of app passwords.
-- Paid API keys as an `AiClient` option, for licensing.
 - Reading Apple Mail's local store without passwords.
 - Scheduled background rescans and a weekly "you got N fewer emails" note.
 - Developer ID signing and notarization for distribution.

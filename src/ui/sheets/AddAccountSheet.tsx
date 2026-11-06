@@ -11,6 +11,7 @@ import { ApiError, api } from "../api.ts";
 import { ErrorNotice, Hint } from "../components/Feedback.tsx";
 import { Icon, type IconName, IconTile } from "../components/Icon.tsx";
 import { Sheet } from "../components/Sheet.tsx";
+import { VisualSteps } from "../components/Steps.tsx";
 import { stepIcon } from "../format.ts";
 import { useLoad } from "../use-load.ts";
 
@@ -75,22 +76,14 @@ function PasswordSteps({ provider }: { provider: ProviderPreset }) {
   const linkAt = provider.steps.findIndex((s) => /button below/i.test(s));
   return (
     <>
-      <ol class="visual-steps">
-        {provider.steps.map((step, i) => (
-          <li key={step} class="visual-step">
-            <span class="visual-step-marker">
-              <IconTile name={stepIcon(step)} />
-              <span class="step-badge" aria-hidden="true">
-                {i + 1}
-              </span>
-            </span>
-            <span class="visual-step-text">
-              <span class="body">{step}</span>
-              {i === linkAt && <SettingsLink provider={provider} />}
-            </span>
-          </li>
-        ))}
-      </ol>
+      <VisualSteps
+        steps={provider.steps.map((step, i) => ({
+          key: step,
+          icon: stepIcon(step),
+          text: step,
+          extra: i === linkAt ? <SettingsLink provider={provider} /> : undefined,
+        }))}
+      />
       {linkAt < 0 && <SettingsLink provider={provider} />}
     </>
   );

@@ -2,6 +2,7 @@ import type {
   ActionStatus,
   HomeSummary,
   MailProviderId,
+  OpenRouterModel,
   Recommendation,
   ScanStatus,
   SenderCategory,
@@ -211,4 +212,27 @@ export function inboxOverview(summary: HomeSummary): string {
 export function scanFraction(status: ScanStatus): number | null {
   if (status.total <= 0 || status.processed <= 0) return null;
   return Math.min(1, Math.max(0, status.processed / status.total));
+}
+
+function dollars(value: number): string {
+  if (value >= 0.01 || value === 0) return `$${value.toFixed(2)}`;
+  return `$${Number(value.toPrecision(2))}`;
+}
+
+// Prices are US dollars per million tokens, as OpenRouter lists them.
+export function modelPrice(model: OpenRouterModel): string {
+  const { promptPerMillion: read, completionPerMillion: write } = model;
+  if (read === null || write === null) return "Price not listed";
+  if (read === 0 && write === 0) return "Free";
+  return `${dollars(read)} per million tokens read, ${dollars(write)} per million written`;
+}
+
+// Measured from the sorting prompt: 100 senders is about 18,000 tokens in and 6,000 out.
+// Models that think before answering use more, so this is a rough floor.
+export function sortCostEstimate(model: OpenRouterModel): string | null {
+  const { promptPerMillion: read, completionPerMillion: write } = model;
+  if (read === null || write === null || (read === 0 && write === 0)) return null;
+  const cost = (18_000 * read + 6_000 * write) / 1_000_000;
+  if (cost < 0.01) return "Less than a cent to sort 100 senders";
+  return `About ${dollars(cost)} to sort 100 senders`;
 }

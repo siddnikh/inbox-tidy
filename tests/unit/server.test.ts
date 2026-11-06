@@ -13,7 +13,8 @@ describe("server", () => {
     const body = (await res.json()) as HealthResponse;
     expect(body.ok).toBe(true);
     expect(body.database.schemaVersion).toBeGreaterThan(0);
-    expect(body.ai.providers.find((p) => p.id === "claude")?.available).toBe(true);
+    expect(body.ai.helpers.find((h) => h.id === "claude")?.state).toBe("ready");
+    expect(body.ai.inUse).toBe("claude");
   });
 
   test("API rejects requests without the session cookie", async () => {
@@ -43,7 +44,7 @@ describe("server", () => {
     app = startTestApp();
     const res = await app.call("/api/ai/check", { method: "POST" });
     const body = (await res.json()) as AiCheckResponse;
-    expect(body.label).toBe("Claude");
+    expect(body.label).toBe("Claude Code");
   });
 
   test("settings persist and validate", async () => {

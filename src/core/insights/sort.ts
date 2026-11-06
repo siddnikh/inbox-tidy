@@ -192,6 +192,7 @@ export async function sortSenders(
       try {
         const reply = await ctx.ai.ask(buildPrompt(batch), {
           jsonSchema: SORT_SCHEMA,
+          schemaName: "sender_sorting",
           timeoutMs: BATCH_TIMEOUT_MS,
         });
         provider = reply.provider;

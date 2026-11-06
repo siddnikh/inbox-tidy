@@ -4,12 +4,19 @@ import type { AppContext } from "./context.ts";
 import { apiError, type Handler, HttpError, type Method, type RouteTable } from "./http.ts";
 import { accountRoutes } from "./routes/accounts.ts";
 import { actionRoutes } from "./routes/actions.ts";
+import { aiRoutes } from "./routes/ai.ts";
 import { insightRoutes } from "./routes/insights.ts";
 import { systemRoutes } from "./routes/system.ts";
 
 export const SESSION_COOKIE = "inbox_tidy_session";
 
-const apiTables: RouteTable[] = [systemRoutes, accountRoutes, insightRoutes, actionRoutes];
+const apiTables: RouteTable[] = [
+  systemRoutes,
+  aiRoutes,
+  accountRoutes,
+  insightRoutes,
+  actionRoutes,
+];
 
 export interface StartedServer {
   server: Server<undefined>;
