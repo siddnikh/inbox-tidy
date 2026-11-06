@@ -1,4 +1,4 @@
-.PHONY: install infra-up infra-down infra-reset dev test test-integration lint format typecheck check build install-app qa
+.PHONY: install infra-up infra-down infra-reset dev test test-integration lint format typecheck check build install-app release qa
 
 install:
 	bun install
@@ -39,5 +39,8 @@ build:
 
 install-app: build
 	bun run install-app
+
+release: check
+	bun scripts/release.ts
 
 qa: check test-integration build
