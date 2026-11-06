@@ -2,6 +2,8 @@
 
 Inbox Tidy is a personal macOS app that shows the user who fills their inbox, recommends senders to unsubscribe from, unsubscribes, and trashes old email. The user is non-technical: every screen and message must be plain-language.
 
+These are the rules for contributors and coding agents working on this repository. An agent asked to install or set up the app for someone should follow `docs/INSTALL_WITH_AN_AGENT.md` instead.
+
 ## Sources of truth
 
 - Read `ctx/INITIAL_SPEC.md`, `ctx/TECH.md`, `ctx/DESIGN.md`, `ctx/FEATURES.md`, and `ctx/SPRINT.md` before planning or implementing.
