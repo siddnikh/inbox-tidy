@@ -60,7 +60,7 @@ Inbox Tidy is a personal macOS app that shows the user who fills their inbox, re
 - If a preferred model is unavailable, use the closest capable available model and continue.
 - Proactively delegate independent research, codebase discovery, knowledge gathering, small isolated UI edits, documentation updates, test investigation, and PR preparation to subagents when the harness supports them.
 - Run independent subtasks in parallel, give each subagent a concrete bounded deliverable, avoid assigning the same files concurrently, review every result, integrate centrally, and keep final responsibility in the main agent.
-- Feature areas map to separate files (`src/core/routes/{accounts,insights,actions}.ts`, `src/core/{mail,insights,actions}/`, `src/ui/`), and migration versions 2 to 4 are reserved per area, so parallel work rarely collides.
+- Feature areas map to separate files (`src/core/routes/{accounts,insights,actions}.ts`, `src/core/{mail,insights,actions}/`, `src/ui/`), so parallel work rarely collides. Each new migration takes the next free version when it merges; never ship an empty placeholder version, because databases that pass it never run what is filled in later.
 - Skip delegation when coordination would cost more than the task.
 
 ## Project skills

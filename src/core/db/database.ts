@@ -28,6 +28,7 @@ export function migrate(db: Database, migrations: Migration[] = defaultMigration
     if (migration.version <= current) continue;
     db.transaction(() => {
       if (migration.sql.trim()) db.run(migration.sql);
+      migration.run?.(db);
       db.run(`PRAGMA user_version = ${migration.version}`);
     })();
   }
