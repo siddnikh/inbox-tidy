@@ -52,11 +52,18 @@ export function listAccounts(ctx: AppContext): AccountRow[] {
 }
 
 export async function accountPassword(ctx: AppContext, account: AccountRow): Promise<string> {
-  const pass = await ctx.secrets.get(account.email);
+  // A denied or dismissed Keychain prompt looks the same as a missing item, so the message
+  // covers both, the prompt first because it is far more common after an app update.
+  let pass: string | null = null;
+  try {
+    pass = await ctx.secrets.get(account.email);
+  } catch (error) {
+    console.error(`Reading the Keychain item for ${account.email} failed:`, error);
+  }
   if (!pass) {
     throw new HttpError(
       409,
-      `Inbox Tidy lost the password for ${account.email}. Remove the account and add it again.`,
+      `Inbox Tidy couldn't read the saved password for ${account.email}. If your Mac asks to let Inbox Tidy use your Keychain, type your Mac password, choose Always Allow, and scan again. If it keeps happening, remove the account and add it again.`,
     );
   }
   return pass;
