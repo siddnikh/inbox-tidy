@@ -368,7 +368,8 @@ describe("unsubscribe", () => {
     });
     expect(results[0]).toMatchObject({
       status: "opened_in_browser",
-      message: "Opened their unsubscribe page in your browser. Press the button there to finish.",
+      message:
+        'Opened their unsubscribe page in your browser. Finish there, then tick "I\'ve unsubscribed" in Inbox Tidy.',
     });
     expect(opened).toEqual(["https://unsubscribe.example.test/page?u=1"]);
     expect(actionRows(box.app.ctx, id)[0]).toMatchObject({
