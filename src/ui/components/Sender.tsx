@@ -1,12 +1,14 @@
-import type { SenderRow } from "../../shared/api.ts";
+import type { SenderRow, UnsubscribeMethod } from "../../shared/api.ts";
 import {
   categoryLabel,
   methodBadge,
+  methodIcon,
   monogram,
   monthlyRate,
   readShare,
   recommendationLabel,
 } from "../format.ts";
+import { Hint } from "./Feedback.tsx";
 import { Icon } from "./Icon.tsx";
 
 export function isSuggested(s: SenderRow): boolean {
@@ -34,13 +36,22 @@ export function SenderSubtitle({ sender }: { sender: SenderRow }) {
   );
 }
 
+export function MethodBadge({ method }: { method: UnsubscribeMethod }) {
+  return (
+    <span class={`badge badge-quiet badge-method method-${method}`}>
+      <Icon name={methodIcon(method)} size={12} />
+      {methodBadge(method)}
+    </span>
+  );
+}
+
 export function SenderBadges({ sender }: { sender: SenderRow }) {
   return (
     <span class="badges">
       {isSuggested(sender) && <span class="badge badge-accent">Suggested</span>}
       {sender.status === "unsubscribed" && <span class="badge">Unsubscribed</span>}
       {sender.status === "kept" && <span class="badge">Kept</span>}
-      <span class="badge badge-quiet">{methodBadge(sender.unsubscribeMethod)}</span>
+      <MethodBadge method={sender.unsubscribeMethod} />
     </span>
   );
 }
@@ -124,24 +135,27 @@ export function SenderListRow({
           <div class="button-row">
             {canUnsubscribe && (
               <button type="button" class="button button-primary" onClick={onUnsubscribe}>
+                <Icon name="bellOff" size={14} />
                 Unsubscribe
               </button>
             )}
             <button type="button" class="button" onClick={onToggleKeep} disabled={keepPending}>
+              <Icon name="pin" size={14} />
               {sender.status === "kept" ? "Stop keeping" : "Keep"}
             </button>
             <button type="button" class="button" onClick={onTrash}>
+              <Icon name="trash" size={14} />
               Move old emails to Trash
             </button>
           </div>
           {sender.unsubscribeMethod === "none" && (
-            <p class="caption secondary">
+            <Hint icon="skip">
               This sender doesn't offer a way to unsubscribe. You can still move their emails to
               Trash.
-            </p>
+            </Hint>
           )}
           {sender.status !== "kept" && (
-            <p class="caption secondary">Keep hides this sender from suggestions.</p>
+            <Hint icon="pin">Keep hides this sender from suggestions.</Hint>
           )}
         </div>
       )}

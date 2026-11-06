@@ -66,7 +66,8 @@ static const CGFloat kTitleBarHeight = 28;
   self.window.titlebarAppearsTransparent = YES;
   self.window.titleVisibility = NSWindowTitleHidden;
   self.window.minSize = NSMakeSize(820, 580);
-  self.window.backgroundColor = [NSColor windowBackgroundColor];
+  self.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+  self.window.backgroundColor = [NSColor colorWithSRGBRed:0x14 / 255.0 green:0x0D / 255.0 blue:0x29 / 255.0 alpha:1];
   [self.window center];
   [self.window setFrameAutosaveName:@"InboxTidyMainWindow"];
 
@@ -217,10 +218,10 @@ static const CGFloat kTitleBarHeight = 28;
   NSString *safeTitle = [self escape:title];
   NSString *safeDetail = detail ? [self escape:detail] : @"";
   NSString *html = [NSString stringWithFormat:
-      @"<!doctype html><html><head><meta name='color-scheme' content='light dark'><style>"
+      @"<!doctype html><html><head><meta name='color-scheme' content='dark'><style>"
        "body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;"
-       "font:15px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;background:Canvas;color:CanvasText;text-align:center}"
-       "p{max-width:440px;color:GrayText;margin:8px auto 0}h1{font-size:20px;font-weight:600;margin:0}"
+       "font:15px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;background:#140D29;color:#FFFFFF;text-align:center}"
+       "p{max-width:440px;color:rgba(255,255,255,.74);margin:8px auto 0}h1{font-size:20px;font-weight:600;margin:0}"
        "</style></head><body><div><h1>%@</h1><p>%@</p></div></body></html>",
       safeTitle, safeDetail];
   [self.webView loadHTMLString:html baseURL:nil];

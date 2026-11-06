@@ -49,6 +49,7 @@ function EmptyForFilter({
     return (
       <EmptyState
         title={`No senders match "${query}".`}
+        art="search"
         action={
           <button type="button" class="button" onClick={onClearSearch}>
             Clear search
@@ -64,6 +65,8 @@ function EmptyForFilter({
       return (
         <EmptyState
           title="No suggestions right now."
+          art={scanRunning(app.scan) ? "mail" : "check"}
+          artTone={scanRunning(app.scan) ? "accent" : "success"}
           action={
             <button type="button" class="button" onClick={() => onShowFilter("all")}>
               Show all senders
@@ -79,8 +82,10 @@ function EmptyForFilter({
       return (
         <EmptyState
           title="No senders yet."
+          art="mail"
           action={
             <button type="button" class="button button-primary" onClick={app.openAddAccount}>
+              <Icon name="plus" size={14} />
               Add an email account
             </button>
           }
@@ -92,7 +97,7 @@ function EmptyForFilter({
       );
     case "can_unsubscribe":
       return (
-        <EmptyState title="No senders offer a way to unsubscribe.">
+        <EmptyState title="No senders offer a way to unsubscribe." art="skip">
           None of the emails Inbox Tidy found include an unsubscribe option. You can still move old
           emails to Trash from the All list.
         </EmptyState>
@@ -101,6 +106,7 @@ function EmptyForFilter({
       return (
         <EmptyState
           title="You haven't unsubscribed from anyone yet."
+          art="bellOff"
           action={
             <button type="button" class="button" onClick={() => onShowFilter("suggested")}>
               Show suggestions
@@ -112,7 +118,7 @@ function EmptyForFilter({
       );
     case "kept":
       return (
-        <EmptyState title="You haven't kept any senders.">
+        <EmptyState title="You haven't kept any senders." art="pin">
           Keeping a sender hides it from suggestions. Open a sender and choose Keep.
         </EmptyState>
       );
@@ -282,6 +288,7 @@ export function Senders() {
               class="button"
               onClick={() => app.openTrash(selectedRows, clearSelection)}
             >
+              <Icon name="trash" size={14} />
               Move emails to Trash
             </button>
             <button
@@ -289,6 +296,7 @@ export function Senders() {
               class="button button-primary"
               onClick={() => app.openUnsubscribe(selectedRows, clearSelection)}
             >
+              <Icon name="bellOff" size={14} />
               Unsubscribe from {selectedRows.length}
             </button>
           </div>

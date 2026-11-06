@@ -2,7 +2,8 @@ import { useState } from "preact/hooks";
 import type { AccountSummary } from "../../shared/api.ts";
 import { ApiError, api } from "../api.ts";
 import { scanRunning, useApp } from "../app-state.ts";
-import { EmptyState, ErrorNotice, SkeletonRows } from "../components/Feedback.tsx";
+import { EmptyState, ErrorNotice, Hint, SkeletonRows } from "../components/Feedback.tsx";
+import { Icon, IconTile } from "../components/Icon.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
 import { Sheet } from "../components/Sheet.tsx";
 import { plural, providerLabel, relativeTime } from "../format.ts";
@@ -52,9 +53,15 @@ function RemoveAccountSheet({
         Inbox Tidy will forget this account's password and its copy of the list of senders and
         emails. Senders that only emailed this account disappear from your lists.
       </p>
-      <p class="body secondary">
-        Nothing changes in your real mailbox, and you can add the account again any time.
-      </p>
+      <div class="recover-note">
+        <IconTile name="shield" tone="success" />
+        <p class="callout">
+          <strong>Your mailbox stays as it is.</strong>{" "}
+          <span class="secondary">
+            Nothing changes in your real mailbox, and you can add the account again any time.
+          </span>
+        </p>
+      </div>
       {error && <ErrorNotice title="Couldn't remove the account." message={error} />}
     </Sheet>
   );
@@ -74,19 +81,28 @@ function AccountRow({ account, onRemove }: { account: AccountSummary; onRemove: 
         </span>
         {account.lastScanError ? (
           <>
-            <span class="callout danger">{account.lastScanError}</span>
-            <span class="caption secondary">
-              Press Scan again on Home to retry. If it still fails, remove the account and add it
-              again with a new app password.
+            <span class="callout danger account-error">
+              <Icon name="alert" class="hint-icon" />
+              <span>{account.lastScanError}</span>
+            </span>
+            <span class="hint caption secondary">
+              <Icon name="refresh" class="hint-icon" size={14} />
+              <span>
+                Press Scan again on Home to retry. If it still fails, remove the account and add it
+                again with a new app password.
+              </span>
             </span>
           </>
         ) : (
-          <span class="caption secondary">
-            {scanRunning(app.scan) && app.scan?.accountEmail === account.email
-              ? "Scanning now…"
-              : account.lastScanAt
-                ? `Last checked ${relativeTime(account.lastScanAt)}`
-                : "Not checked yet"}
+          <span class="hint caption secondary">
+            <Icon name="clock" class="hint-icon" size={14} />
+            <span>
+              {scanRunning(app.scan) && app.scan?.accountEmail === account.email
+                ? "Scanning now…"
+                : account.lastScanAt
+                  ? `Last checked ${relativeTime(account.lastScanAt)}`
+                  : "Not checked yet"}
+            </span>
           </span>
         )}
       </span>
@@ -108,6 +124,7 @@ export function Accounts() {
       <PageHeader title="Email accounts">
         {rows && rows.length > 0 && (
           <button type="button" class="button button-primary" onClick={app.openAddAccount}>
+            <Icon name="plus" size={14} />
             Add account
           </button>
         )}
@@ -126,8 +143,10 @@ export function Accounts() {
       {rows && rows.length === 0 && (
         <EmptyState
           title="No email accounts yet."
+          art="mail"
           action={
             <button type="button" class="button button-primary" onClick={app.openAddAccount}>
+              <Icon name="plus" size={14} />
               Add an email account
             </button>
           }
@@ -143,10 +162,10 @@ export function Accounts() {
         </ul>
       )}
       {rows && rows.length > 0 && (
-        <p class="caption secondary">
+        <Hint icon="lock">
           Passwords are kept in your Mac's Keychain. Inbox Tidy only reads your inbox, and changes
           nothing until you confirm an action.
-        </p>
+        </Hint>
       )}
       {removing && (
         <RemoveAccountSheet

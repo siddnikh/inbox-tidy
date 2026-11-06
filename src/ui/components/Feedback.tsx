@@ -1,4 +1,6 @@
 import type { ComponentChildren } from "preact";
+import { Icon, type IconName } from "./Icon.tsx";
+import { SpotArt } from "./Illustration.tsx";
 
 export function ErrorNotice({
   title,
@@ -15,6 +17,7 @@ export function ErrorNotice({
 }) {
   return (
     <div class="notice notice-error" role="alert">
+      <Icon name="alert" class="notice-icon" size={20} />
       <div class="notice-text">
         <p class="headline">{title}</p>
         <p class="callout">{message}</p>
@@ -30,19 +33,59 @@ export function ErrorNotice({
 
 export function EmptyState({
   title,
+  art,
+  artTone,
   children,
   action,
 }: {
   title: string;
+  art: IconName;
+  artTone?: "accent" | "success";
   children?: ComponentChildren;
   action?: ComponentChildren;
 }) {
   return (
     <div class="empty">
+      <SpotArt name={art} tone={artTone} />
       <p class="headline">{title}</p>
       {children && <p class="callout secondary">{children}</p>}
       {action}
     </div>
+  );
+}
+
+// A short explanation or instruction, always led by an icon so it reads at a glance.
+export function Hint({
+  icon = "info",
+  tone,
+  children,
+}: {
+  icon?: IconName;
+  tone?: "danger" | "success";
+  children: ComponentChildren;
+}) {
+  return (
+    <p class={`hint caption ${tone ?? "secondary"}`}>
+      <Icon name={icon} class="hint-icon" size={14} />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+// An inline failure message next to the control that failed.
+export function InlineError({
+  children,
+  announce = true,
+}: {
+  children: ComponentChildren;
+  // Off when the message already sits inside an aria-live region.
+  announce?: boolean;
+}) {
+  return (
+    <p class="inline-error callout" role={announce ? "alert" : undefined}>
+      <Icon name="alert" class="hint-icon" />
+      <span>{children}</span>
+    </p>
   );
 }
 

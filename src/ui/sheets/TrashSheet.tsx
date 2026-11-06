@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import type { ActionResult, SenderRow } from "../../shared/api.ts";
 import { useApp } from "../app-state.ts";
+import { IconTile } from "../components/Icon.tsx";
 import { senderName } from "../components/Sender.tsx";
 import { Sheet } from "../components/Sheet.tsx";
 import { plural } from "../format.ts";
@@ -70,7 +71,7 @@ export function TrashSheet({
             ? `Moved ${plural(moved, "email")} to Trash. You can recover them from your email's Trash folder.`
             : "No emails were moved."}
         </p>
-        <ResultList results={phase.results} showTrashed={false} />
+        <ResultList results={phase.results} />
       </Sheet>
     );
   }
@@ -133,13 +134,22 @@ export function TrashSheet({
           />
         </label>
       </fieldset>
-      <p class="body">
-        {nothingToMove ? "None of their emails match, so nothing would move." : estimate}
-      </p>
-      <p class="callout secondary">
-        They go to your email provider's Trash folder, so you can recover them from there. Nothing
-        is deleted for good.
-      </p>
+      <div class="intro">
+        <IconTile name="trash" tone="danger" size="lg" />
+        <p class="body">
+          {nothingToMove ? "None of their emails match, so nothing would move." : estimate}
+        </p>
+      </div>
+      <div class="recover-note">
+        <IconTile name="restore" tone="success" />
+        <p class="callout">
+          <strong>You can get them back.</strong>{" "}
+          <span class="secondary">
+            They go to your email provider's Trash folder, so you can recover them from there.
+            Nothing is deleted for good.
+          </span>
+        </p>
+      </div>
       {phase.name === "running" && (
         <Progress done={phase.done} total={senders.length} label="Moving emails from sender" />
       )}

@@ -1,5 +1,6 @@
 import type { ScanStage, ScanStatus } from "../../shared/api.ts";
 import { formatNumber, scanFraction } from "../format.ts";
+import { Icon, type IconName } from "./Icon.tsx";
 
 export interface ScanNotice {
   failed: boolean;
@@ -13,6 +14,41 @@ const STAGE_FALLBACK: Record<ScanStage, string> = {
   understanding: "Sorting your senders…",
   done: "Finishing up…",
 };
+
+const STAGES: { stage: Exclude<ScanStage, "done">; label: string; icon: IconName }[] = [
+  { stage: "connecting", label: "Connect", icon: "plug" },
+  { stage: "reading", label: "Read", icon: "mail" },
+  { stage: "understanding", label: "Sort", icon: "sparkles" },
+];
+
+function stageIndex(stage: ScanStage | null): number {
+  if (stage === "done") return STAGES.length;
+  return Math.max(
+    0,
+    STAGES.findIndex((s) => s.stage === stage),
+  );
+}
+
+function StageSteps({ stage }: { stage: ScanStage | null }) {
+  const current = stageIndex(stage);
+  return (
+    <ol class="stage-steps" aria-label="Scan steps">
+      {STAGES.map((s, i) => {
+        const state = i < current ? "done" : i === current ? "active" : "next";
+        return (
+          <li
+            key={s.stage}
+            class={`stage-step stage-${state}`}
+            aria-current={state === "active" ? "step" : undefined}
+          >
+            <Icon name={state === "done" ? "check" : s.icon} size={13} />
+            <span>{s.label}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 function stageSentence(scan: ScanStatus): string {
   if (scan.message) return scan.message;
@@ -28,8 +64,11 @@ export function ScanProgress({ scan, trouble }: { scan: ScanStatus; trouble: boo
   return (
     <section class="scan-bar" aria-label="Scan progress">
       <div class="scan-bar-text">
-        <p class="callout">{sentence}</p>
-        {fraction !== null && <p class="caption secondary">{Math.round(fraction * 100)}%</p>}
+        <p class="callout scan-sentence">{sentence}</p>
+        <StageSteps stage={scan.stage} />
+        {fraction !== null && (
+          <p class="caption secondary scan-percent">{Math.round(fraction * 100)}%</p>
+        )}
       </div>
       <div
         class={`progress ${fraction === null ? "progress-indeterminate" : ""}`}
@@ -48,7 +87,10 @@ export function ScanProgress({ scan, trouble }: { scan: ScanStatus; trouble: boo
         {scan.stage ? STAGE_FALLBACK[scan.stage] : ""}
       </p>
       {trouble && (
-        <p class="caption secondary">Couldn't check how the scan is going. Trying again…</p>
+        <p class="hint caption secondary">
+          <Icon name="clock" class="hint-icon" size={14} />
+          <span>Couldn't check how the scan is going. Trying again…</span>
+        </p>
       )}
     </section>
   );
@@ -72,6 +114,7 @@ export function ScanResultNotice({
     : `The scan finished, but ${notice.errors.length === 1 ? "one account" : `${notice.errors.length} accounts`} couldn't be read.`;
   return (
     <section class="notice notice-error scan-notice" role="alert">
+      <Icon name="alert" class="notice-icon" size={20} />
       <div class="notice-text">
         <p class="headline">{heading}</p>
         {notice.failed && notice.message && <p class="callout">{notice.message}</p>}

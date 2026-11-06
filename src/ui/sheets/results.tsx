@@ -2,7 +2,7 @@ import type { ActionResult, ActionsResponse, SenderRow } from "../../shared/api.
 import { ApiError, api } from "../api.ts";
 import { Icon, type IconName } from "../components/Icon.tsx";
 import { senderName } from "../components/Sender.tsx";
-import { actionStatusLabel, plural } from "../format.ts";
+import { actionStatusLabel } from "../format.ts";
 
 const STATUS_ICONS: Record<ActionResult["status"], IconName> = {
   done: "check",
@@ -40,13 +40,7 @@ export async function runPerSender(
   return results;
 }
 
-export function ResultList({
-  results,
-  showTrashed = true,
-}: {
-  results: ActionResult[];
-  showTrashed?: boolean;
-}) {
+export function ResultList({ results }: { results: ActionResult[] }) {
   return (
     <ul class="list result-list">
       {results.map((r, i) => (
@@ -61,7 +55,6 @@ export function ResultList({
                 {actionStatusLabel(r.status)}.
               </strong>{" "}
               {r.message}
-              {showTrashed && r.trashed > 0 && ` ${plural(r.trashed, "email")} moved to Trash.`}
             </span>
           </span>
         </li>

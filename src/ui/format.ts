@@ -7,6 +7,7 @@ import type {
   SenderCategory,
   UnsubscribeMethod,
 } from "../shared/api.ts";
+import type { IconName } from "./components/Icon.tsx";
 
 const grouped = new Intl.NumberFormat("en-US");
 
@@ -126,8 +127,35 @@ export function methodBadge(method: UnsubscribeMethod): string {
   return METHOD_BADGES[method];
 }
 
+const METHOD_ICONS: Record<UnsubscribeMethod, IconName> = {
+  one_click: "bolt",
+  mailto: "mail",
+  web: "globe",
+  none: "skip",
+};
+
+export function methodIcon(method: UnsubscribeMethod): IconName {
+  return METHOD_ICONS[method];
+}
+
+// Provider steps arrive as plain sentences, so the picture for each is chosen from its words.
+const STEP_ICONS: [RegExp, IconName][] = [
+  [/2-step|two-factor|verification/, "shield"],
+  [/administrator|\badmin\b/, "user"],
+  [/\bcopy\b|\bpaste\b/, "clipboard"],
+  [/imap|smtp|server|help pages/, "server"],
+  [/normal .*password/, "field"],
+  [/\bopen\b|sign in/, "globe"],
+  [/\btype\b|create|generate|app password|app-specific/, "key"],
+];
+
+export function stepIcon(step: string): IconName {
+  const text = step.toLowerCase();
+  return STEP_ICONS.find(([pattern]) => pattern.test(text))?.[1] ?? "info";
+}
+
 const METHOD_PLANS: Record<UnsubscribeMethod, string> = {
-  one_click: "Automatic",
+  one_click: "We'll unsubscribe you automatically",
   mailto: "We'll send them an email for you",
   web: "We'll open their page in your browser. You press the button there.",
   none: "No unsubscribe option, so this one is skipped",

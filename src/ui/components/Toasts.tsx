@@ -21,6 +21,7 @@ export function Toasts({
         <div key={t.id} class={`toast toast-${t.tone}`}>
           {t.tone === "success" && <Icon name="check" class="toast-icon" />}
           {t.tone === "error" && <Icon name="alert" class="toast-icon" />}
+          {t.tone === "info" && <Icon name="info" class="toast-icon" />}
           <span>{t.message}</span>
           <button
             type="button"
