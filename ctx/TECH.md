@@ -61,7 +61,7 @@ Every `/api` request must (1) target exactly `127.0.0.1:<port>` or `localhost:<p
 | Technology | Why |
 | --- | --- |
 | Bun 1.3 | Runtime, package manager, bundler (HTML imports), test runner, SQLite (`bun:sqlite`), Keychain (`Bun.secrets`), and single-binary compile |
-| Objective-C + Cocoa/WebKit via `clang` | Native window with no framework. Swift is avoided because this Mac's Command Line Tools have a Swift compiler and SDK mismatch. |
+| Objective-C + Cocoa/WebKit via `clang` | Native window with no framework. Swift is avoided because Command Line Tools installs often pair a Swift compiler with an SDK it doesn't support, while `clang` keeps working. |
 | Preact 11 | A 4 KB UI library with a React-style API |
 | imapflow / nodemailer | Mature IMAP and SMTP clients that run on Bun |
 | Biome | Formatting and linting |
@@ -85,10 +85,14 @@ scripts/            build, install, dev, icon (build-icon.ts), and readiness too
 tests/unit/         fast tests with in-memory DB, fake AI, memory secret store
 tests/integration/  tests against GreenMail (need `make infra-up`)
 assets/brand/       logo suite, favicons, and palette (README.md)
+docs/               public guides: INSTALL_WITH_AN_AGENT.md, and screenshots/ used by README.md
 ctx/                project knowledge
+README.md           public overview: install, first use, privacy, update, uninstall, troubleshooting
 .local/             ignored: dev data, QA helpers, screenshots
 dist/               ignored: build output
 ```
+
+README screenshots (`docs/screenshots/*.png`) are captured from the real UI in headless Chromium at 2x, against GreenMail with made-up senders, and never from a real mailbox. They're saved as 1600 px wide, 256-colour PNGs without dithering, which keeps each one under about 150 KB.
 
 ## Prerequisites
 
