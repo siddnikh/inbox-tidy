@@ -19,7 +19,7 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 - **Discovery:** On first open, home shows an "Add your first email account" card. The Accounts tab shows the list and an "Add account" button.
 - **Journey:**
   1. Pick a provider from large tiles: Gmail, iCloud Mail, Yahoo Mail, Rediffmail Pro, or Other.
-  2. See numbered plain-language steps for creating an app password, with a button that opens the provider's page in the browser.
+  2. See numbered plain-language steps for creating an app password, each with an icon, and a button inside the step that opens the provider's page in the browser. Rediffmail Pro, which uses the normal password once IMAP is on, says so and continues with "Continue" instead of "I have my app password".
   3. Enter the email address and app password, then press "Connect", which shows "Checking…".
   4. On success, see "Connected" with the account in the list, and a scan starts automatically.
   5. On failure, see a specific message (wrong password or app password needed, server unreachable, IMAP disabled) while the form keeps its input.
