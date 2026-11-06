@@ -103,7 +103,7 @@ The system font stack is `-apple-system, BlinkMacSystemFont, "SF Pro Text"/"SF P
 - Information is never carried by colour alone: badges and statuses carry text, and success and error differ by icon (check or alert) as well as by mint or coral.
 - Decorative icons and illustrations are `aria-hidden`; the text next to them carries the meaning.
 - Text can be zoomed with Cmd and the plus key without breaking the layout.
-- The app is always dark, whatever the system appearance.
+- The app is always dark, whatever the system appearance. The native window uses the dark appearance and the base #140D29 for its background and startup or error pages, so nothing flashes light before the UI paints.
 
 ## App icon
 
