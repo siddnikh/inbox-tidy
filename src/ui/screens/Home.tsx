@@ -1,11 +1,13 @@
-import { useState } from "preact/hooks";
-import type { HomeSummary, SenderRow } from "../../shared/api.ts";
+import { useEffect, useState } from "preact/hooks";
+import type { AccountSummary, HomeSummary, SenderRow } from "../../shared/api.ts";
 import { ApiError, api } from "../api.ts";
 import { scanRunning, useApp } from "../app-state.ts";
 import { EmptyState, ErrorNotice, InlineError, SkeletonRows } from "../components/Feedback.tsx";
 import { Icon, type IconName, IconTile } from "../components/Icon.tsx";
 import { SpotArt, WelcomeArt } from "../components/Illustration.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
+import { ScanCard } from "../components/ScanBar.tsx";
+import { SegmentedTabs } from "../components/Segmented.tsx";
 import { Monogram, SenderSubtitle, senderName } from "../components/Sender.tsx";
 import { formatNumber, inboxOverview, monthlyRate, readShare, relativeTime } from "../format.ts";
 import { useLoad } from "../use-load.ts";
@@ -110,11 +112,12 @@ function Welcome() {
   );
 }
 
-function Suggestions() {
+function Suggestions({ accountId }: { accountId: number | null }) {
   const app = useApp();
+  const scope = accountId === null ? "" : `&account=${accountId}`;
   const list = useLoad(
-    () => api<SenderRow[]>("/api/senders?filter=suggested&sort=most"),
-    "suggested",
+    () => api<SenderRow[]>(`/api/senders?filter=suggested&sort=most${scope}`),
+    `suggested${scope}`,
     app.version,
   );
   const top = list.data?.slice(0, 5);
@@ -214,15 +217,93 @@ function ScanFooter({ lastScanAt }: { lastScanAt: string | null }) {
   );
 }
 
+const ACCOUNT_KEY = "inbox-tidy.home-account";
+const ALL = "all";
+
+function storedAccount(): string {
+  try {
+    return localStorage.getItem(ACCOUNT_KEY) ?? ALL;
+  } catch {
+    return ALL;
+  }
+}
+
+function useHomeAccount(accounts: AccountSummary[] | undefined) {
+  const [choice, setChoice] = useState(storedAccount);
+  const exists = accounts?.some((a) => String(a.id) === choice) ?? false;
+  const selected = choice !== ALL && exists ? Number(choice) : null;
+
+  useEffect(() => {
+    if (accounts && choice !== ALL && !exists) setChoice(ALL);
+  }, [accounts, choice, exists]);
+
+  const choose = (value: string) => {
+    setChoice(value);
+    try {
+      localStorage.setItem(ACCOUNT_KEY, value);
+    } catch {
+      // Private storage can be unavailable; the choice still applies for this session.
+    }
+  };
+  return { selected, choose };
+}
+
+function AccountPicker({
+  accounts,
+  selected,
+  onChange,
+}: {
+  accounts: AccountSummary[];
+  selected: number | null;
+  onChange: (value: string) => void;
+}) {
+  if (accounts.length === 1) {
+    const only = accounts[0] as AccountSummary;
+    return (
+      <p class="account-chip">
+        <Icon name="mail" size={14} />
+        {only.email}
+      </p>
+    );
+  }
+  return (
+    <div class="account-tabs">
+      <SegmentedTabs
+        label="Show one email account"
+        value={selected === null ? ALL : String(selected)}
+        onChange={onChange}
+        options={[
+          { value: ALL, label: "All accounts" },
+          ...accounts.map((a) => ({ value: String(a.id), label: a.email })),
+        ]}
+      />
+    </div>
+  );
+}
+
 export function Home() {
   const app = useApp();
-  const summary = useLoad(() => api<HomeSummary>("/api/summary"), "summary", app.version);
+  const accounts = useLoad(() => api<AccountSummary[]>("/api/accounts"), "accounts", app.version);
+  const { selected, choose } = useHomeAccount(accounts.data);
+  const scope = selected === null ? "" : `?account=${selected}`;
+  const summary = useLoad(
+    () => api<HomeSummary>(`/api/summary${scope}`),
+    `summary${scope}`,
+    app.version,
+  );
+  const running = app.scan?.state === "running" ? app.scan : null;
+  const picker = accounts.data && accounts.data.length > 0 && (
+    <AccountPicker accounts={accounts.data} selected={selected} onChange={choose} />
+  );
+  const scanCard = running && <ScanCard scan={running} trouble={app.scanTrouble} />;
 
   if (summary.data === undefined) {
     if (summary.error) {
       return (
         <div class="stack">
           <PageHeader title="Your inbox" />
+          {picker}
+          {scanCard}
           <ErrorNotice
             title="Couldn't load your home screen."
             message={summary.error}
@@ -235,6 +316,8 @@ export function Home() {
     return (
       <div class="stack">
         <PageHeader title="Your inbox" />
+        {picker}
+        {scanCard}
         <ImpactSkeleton />
         <span class="skeleton skeleton-text" style={{ width: "80%" }} />
         <SkeletonRows count={5} label="Loading suggestions" />
@@ -255,9 +338,11 @@ export function Home() {
   return (
     <div class="stack">
       <PageHeader title="Your inbox" />
+      {picker}
+      {scanCard}
       <ImpactCards impact={data.impact} />
       <p class="body overview">{inboxOverview(data)}</p>
-      <Suggestions />
+      <Suggestions accountId={selected} />
       <ScanFooter lastScanAt={data.lastScanAt} />
     </div>
   );

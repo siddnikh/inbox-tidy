@@ -65,3 +65,4 @@ The overnight build of Inbox Tidy (2026-11-06) is complete: connecting accounts,
   - GitHub description and topics.
   - A pre-publication audit of history and tracked files found no secrets and no absolute paths. The commit email is a personal Gmail address.
 - 2026-11-06: The owner's first real Gmail account couldn't be scanned or removed. The real database had been created by the foundation build while migrations 2 to 4 were empty placeholders, so it was marked version 4 and never got the columns that 2 and 3 added later. Migration 5 repairs such databases; it was checked on a copy of the real database (upgrade and account removal both work).
+- 2026-11-06: Home gained account tabs and a large scan card. Found while checking it: an account added during a running scan was never scanned, because the second start request was ignored; a request during a scan now queues one more pass. A scan bar parked at 0% during AI sorting is now indeterminate.

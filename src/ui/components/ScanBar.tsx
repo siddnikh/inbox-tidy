@@ -1,6 +1,6 @@
 import type { ScanStage, ScanStatus } from "../../shared/api.ts";
 import { formatNumber, scanFraction } from "../format.ts";
-import { Icon, type IconName } from "./Icon.tsx";
+import { Icon, type IconName, IconTile } from "./Icon.tsx";
 
 export interface ScanNotice {
   failed: boolean;
@@ -142,6 +142,71 @@ export function ScanResultNotice({
           Dismiss
         </button>
       </div>
+    </section>
+  );
+}
+
+const STAGE_TITLE: Record<ScanStage, string> = {
+  connecting: "Connecting to your email",
+  reading: "Reading your emails",
+  understanding: "Sorting your senders",
+  done: "Finishing up",
+};
+
+const STAGE_ICON: Record<ScanStage, IconName> = {
+  connecting: "plug",
+  reading: "mail",
+  understanding: "sparkles",
+  done: "check",
+};
+
+export function ScanCard({ scan, trouble }: { scan: ScanStatus; trouble: boolean }) {
+  const fraction = scanFraction(scan);
+  const sentence = stageSentence(scan);
+  const stage = scan.stage ?? "connecting";
+  return (
+    <section class="card scan-card" aria-label="Scan progress">
+      <div class="scan-card-head">
+        <span class="scan-card-icon">
+          <IconTile name={STAGE_ICON[stage]} tone="brand" size="lg" />
+        </span>
+        <div class="scan-card-title">
+          <h2 class="title">{scan.stage ? STAGE_TITLE[scan.stage] : "Getting ready to scan"}</h2>
+          {scan.accountEmail && <p class="callout secondary">{scan.accountEmail}</p>}
+        </div>
+        <p class="scan-card-percent" aria-hidden="true">
+          {fraction === null ? "" : `${Math.round(fraction * 100)}%`}
+        </p>
+      </div>
+      <div
+        class={`progress progress-large ${fraction === null ? "progress-indeterminate" : ""}`}
+        role="progressbar"
+        aria-label={sentence}
+        aria-valuemin={0}
+        aria-valuemax={scan.total > 0 ? scan.total : undefined}
+        aria-valuenow={fraction === null ? undefined : scan.processed}
+      >
+        <div
+          class="progress-fill"
+          style={fraction === null ? undefined : { width: `${fraction * 100}%` }}
+        />
+      </div>
+      <div class="scan-card-foot">
+        <p class="body scan-sentence">{sentence}</p>
+        <StageSteps stage={scan.stage} />
+      </div>
+      <p class="hint caption secondary">
+        <Icon name="info" class="hint-icon" size={14} />
+        <span>
+          You can keep using Inbox Tidy while this runs. The numbers below update when it finishes.
+        </span>
+      </p>
+      {trouble && (
+        <p class="hint caption secondary">
+          <Icon name="clock" class="hint-icon" size={14} />
+          <span>Couldn't check how the scan is going. Trying again…</span>
+        </p>
+      )}
     </section>
   );
 }

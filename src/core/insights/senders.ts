@@ -88,6 +88,8 @@ interface SenderDbRow {
 
 export interface LoadOptions {
   senderId?: number;
+  // Limits stats and subjects to one account's messages and drops senders with none there.
+  accountId?: number;
   withSubjects?: boolean;
   now?: number;
 }
@@ -119,10 +121,16 @@ export function loadSenderRows(ctx: AppContext, options: LoadOptions = {}): Send
   const { lookbackMonths } = ctx.settings();
   const since = windowStart(lookbackMonths, now);
   const one = options.senderId !== undefined;
+  const scoped = options.accountId !== undefined;
   const senderClause = one ? "WHERE s.id = $senderId" : "";
-  const messageClause = one ? "WHERE sender_id = $senderId" : "";
+  const messageFilters = [
+    ...(one ? ["sender_id = $senderId"] : []),
+    ...(scoped ? ["account_id = $accountId"] : []),
+  ];
+  const messageClause = messageFilters.length ? `WHERE ${messageFilters.join(" AND ")}` : "";
   const params: Record<string, string | number> = { since };
   if (one) params.senderId = options.senderId as number;
+  if (scoped) params.accountId = options.accountId as number;
 
   const rows = ctx.db
     .query<SenderDbRow, [Record<string, string | number>]>(
@@ -164,6 +172,7 @@ export function loadSenderRows(ctx: AppContext, options: LoadOptions = {}): Send
            WHERE trashed_at IS NULL AND received_at >= $since
              AND subject IS NOT NULL AND TRIM(subject) != ''
              ${one ? "AND sender_id = $senderId" : ""}
+             ${scoped ? "AND account_id = $accountId" : ""}
          ) WHERE rn <= ${RECENT_SUBJECTS}
          ORDER BY sender_id, rn`,
       )
@@ -180,6 +189,7 @@ export function loadSenderRows(ctx: AppContext, options: LoadOptions = {}): Send
     const total = row.total ?? 0;
     const status = senderStatus(row);
     if (!one && total === 0 && status !== "unsubscribed") continue;
+    if (scoped && !row.last_any_at) continue;
     const readCount = row.read_count ?? 0;
     result.push({
       id: row.id,
@@ -240,6 +250,7 @@ function compareRows(sort: SenderSort): (a: SenderRow, b: SenderRow) => number {
 }
 
 export interface ListOptions {
+  accountId?: number;
   filter?: SenderFilter;
   sort?: SenderSort;
   q?: string;
@@ -250,7 +261,7 @@ export function listSenders(ctx: AppContext, options: ListOptions = {}): SenderR
   const filter = options.filter ?? "all";
   const sort = options.sort ?? "most";
   const q = options.q?.trim().toLowerCase() ?? "";
-  return loadSenderRows(ctx, { now: options.now })
+  return loadSenderRows(ctx, { now: options.now, accountId: options.accountId })
     .filter((row) => matchesFilter(row, filter))
     .filter(
       (row) =>

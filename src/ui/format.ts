@@ -206,8 +206,9 @@ export function inboxOverview(summary: HomeSummary): string {
   return `${span} you got ${emails} from ${plural(inbox.senders, "sender")}. ${unreadSentence}`;
 }
 
-// Returns a 0–1 fraction, or null when the scan hasn't reported a total yet.
+// Returns a 0–1 fraction, or null (an indeterminate bar) until the scan reports a total and
+// its first finished item: sorting runs as one long AI call, and a bar parked at 0% looks frozen.
 export function scanFraction(status: ScanStatus): number | null {
-  if (status.total <= 0) return null;
+  if (status.total <= 0 || status.processed <= 0) return null;
   return Math.min(1, Math.max(0, status.processed / status.total));
 }

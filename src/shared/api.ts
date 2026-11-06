@@ -77,7 +77,8 @@ export interface AddAccountRequest {
 export type ScanState = "idle" | "running" | "done" | "failed";
 export type ScanStage = "connecting" | "reading" | "understanding" | "done";
 
-// POST /api/scan -> ScanStatus (starts a scan of every account; returns current status if one is running)
+// POST /api/scan -> ScanStatus (starts a scan of every account; while one runs, queues one more
+// full pass after it and returns the current status)
 // GET /api/scan -> ScanStatus
 export interface ScanStatus {
   state: ScanState;
@@ -92,7 +93,8 @@ export interface ScanStatus {
   errors: { accountEmail: string; message: string }[];
 }
 
-// GET /api/summary
+// GET /api/summary?account=id -> HomeSummary. Without account, covers every account; with it,
+// inbox stats and impact cover that account only (inbox.accounts still counts all accounts).
 export interface HomeSummary {
   impact: {
     sendersUnsubscribed: number;
@@ -128,7 +130,8 @@ export type SenderStatus = "active" | "unsubscribed" | "kept";
 export type SenderFilter = "suggested" | "all" | "can_unsubscribe" | "kept" | "unsubscribed";
 export type SenderSort = "most" | "least_read" | "recent";
 
-// GET /api/senders?filter=SenderFilter&sort=SenderSort&q=search -> SenderRow[]
+// GET /api/senders?filter=SenderFilter&sort=SenderSort&q=search&account=id -> SenderRow[]
+// With account, stats and subjects count only that account's emails.
 export interface SenderRow {
   id: number;
   address: string;

@@ -38,11 +38,11 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 
 - **Status:** Built
 - **Built now:** The scanner (`src/core/mail/scanner.ts`) and `GET`/`POST /api/scan`, with incremental sync, staged progress, and per-account errors.
-- **Built now (UI):** A global scan bar with stage sentences and a determinate bar, a finish toast, and "Scan again" on Home. Verified end to end: 2,232 emails from 15 senders read and sorted by the real Claude in about 17 s, with a follow-up incremental scan taking about 1 s.
+- **Built now (UI):** A large scan card at the top of Home and a slim scan bar in the header on the other tabs, both with stage sentences and a progress bar, plus a finish toast and "Scan again" on Home. Verified end to end: 2,232 emails from 15 senders read and sorted by the real Claude in about 17 s, with a follow-up incremental scan taking about 1 s.
 - **Problem and outcome:** The app learns who emails the user, how often, and whether the user reads those emails, without downloading message bodies.
-- **Journey:** A scan starts after an account is connected, or from "Scan again" on home. The user sees a determinate progress bar with a stage sentence. They can move around the app while it runs, and a slim bar remains visible.
+- **Journey:** A scan starts after an account is connected, or from "Scan again" on home. The user sees a determinate progress bar with a stage sentence. Home shows a large scan card (stage title, account being read, percentage, bar, Connect/Read/Sort steps). They can move around the app while it runs, and a slim bar stays visible in the header on other tabs.
 - **Requirements:**
-  - `POST /api/scan` starts a background scan of all accounts and returns `ScanStatus` immediately. `GET /api/scan` is polled about once per second.
+  - `POST /api/scan` starts a background scan of all accounts and returns `ScanStatus` immediately. Asking while a scan runs (including adding an account) queues one more full pass after it, so an account added mid-scan is always read. `GET /api/scan` is polled about once per second.
   - Each account's `INBOX` is searched `SINCE` now minus the lookback months. Envelope (from, subject, date), flags (`\Seen`), `internalDate`, and only the `List-Unsubscribe` and `List-Unsubscribe-Post` headers are fetched, in batches.
   - Scans are incremental, using `mailbox_state`: new UIDs above `last_uid` are fetched, flags are refreshed for already-known messages so read and unread stays current, messages no longer on the server are removed, and a UIDVALIDITY change triggers a full rescan.
   - Senders are upserted by lowercased address. Each keeps the newest unsubscribe header (see feature 5 for parsing) and the account it came from.
@@ -118,20 +118,22 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 ## 7. Home: value at a glance
 
 - **Status:** Built
-- **Built now:** The welcome card with no accounts; three impact cards with encouraging copy at zero; the inbox overview sentence; the top suggestions with quick Unsubscribe; the last scan time and "Scan again". Verified against real data: "3 senders, 58 fewer emails a month, 779 moved to Trash".
+- **Built now:** The welcome card with no accounts; account tabs ("All accounts" plus one per account, shown with two or more accounts, remembered across launches; one account shows as a chip); the scan card while a scan runs; three impact cards with encouraging copy at zero; the inbox overview sentence; the top suggestions with quick Unsubscribe; the last scan time and "Scan again". Verified against real data: "3 senders, 58 fewer emails a month, 779 moved to Trash".
 - **Problem and outcome:** The first screen shows how Inbox Tidy has helped and what to do next.
 - **Journey:**
   - With no accounts, a welcome card explains the app in two sentences and leads to adding an account.
-  - Otherwise, three impact cards at the top: "Senders you've unsubscribed from", "Fewer emails a month" (expected), and "Emails moved to Trash".
+  - Otherwise, account tabs come first. Choosing an account limits everything below it to that account. While a scan runs, the scan card sits under the tabs.
+  - Then three impact cards: "Senders you've unsubscribed from", "Fewer emails a month" (expected), and "Emails moved to Trash".
   - Below them, an inbox overview sentence: "In the last 12 months you got about 9,400 emails from 612 senders. You left 71% unread."
   - Then the top five suggestions with quick "Unsubscribe" actions and a "See all senders" link.
   - Finally, the last scan time and "Scan again".
 - **Requirements:**
-  - `GET /api/summary` provides the data.
+  - `GET /api/summary` provides the data; `?account=<id>` limits the inbox numbers, impact, and last scan time to one account, and the suggestions use `GET /api/senders?account=<id>`.
+  - Per account, unsubscribed senders are those with any stored email in that account, their expected saving is split by that account's share of the sender's stored emails, and trashed emails are counted from that account's messages marked trashed.
   - `sendersUnsubscribed` counts distinct senders whose latest unsubscribe action is `done` or `opened_in_browser`.
   - `emailsAvoidedPerMonth` is the sum of `emails_per_month_before` over those senders, rounded.
   - `emailsTrashed` is the sum of `messages_affected` from successful trash actions.
-- **Edge cases:** All zeros before any action shows encouraging copy instead of "0", and a scan in progress shows the scan bar here too.
+- **Edge cases:** All zeros before any action shows encouraging copy instead of "0", and a scan in progress shows the scan card here instead of the header bar.
 
 ## 8. Settings
 
