@@ -88,7 +88,11 @@ The system font stack is `-apple-system, BlinkMacSystemFont, "SF Pro Text"/"SF P
 
 ## App icon
 
-The icon is a blue rounded square (the accent gradient) holding a white envelope and a white check badge. The source is `shell/icon/AppIcon.svg`, built into `shell/AppIcon.icns` (all sizes 16–1024).
+The icon is a purple rounded square (`#5B34D6`, with a gentle top-to-bottom gradient) holding a white inbox tray with a yellow (`#FFCB47`) spark rising out of it and a small lavender (`#B9A9E8`) glint: an empty, tidy inbox. It follows the macOS grid: a 1024 canvas with an 824 px tile and 185 px corners, centred.
+
+- `shell/icon/AppIcon.svg` is the full icon. `shell/icon/AppIcon-small.svg` is a simplified drawing on a 16 px grid (thicker walls, no glint) used for the 16 and 32 px slots.
+- `bun scripts/build-icon.ts` renders both with `scripts/render-svg.m` (an AppKit SVG renderer) and builds `shell/AppIcon.icns` (all sizes 16–1024, @1x and @2x) with `iconutil`.
+- The logo suite (lockups for light and dark backgrounds, the standalone mark, one-colour versions, the submark, and favicons) and the palette roles live in `assets/brand/` (see its README).
 
 ## Unresolved
 

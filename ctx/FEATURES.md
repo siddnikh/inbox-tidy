@@ -147,4 +147,4 @@ Statuses: `Not started`, `In progress`, `Partial`, `Built`, `Future idea`.
 - Paid API keys as an `AiClient` option, for licensing.
 - Reading Apple Mail's local store without passwords.
 - Scheduled background rescans and a weekly "you got N fewer emails" note.
-- An app icon, Developer ID signing, and notarization for distribution.
+- Developer ID signing and notarization for distribution.
