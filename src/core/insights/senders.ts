@@ -14,6 +14,7 @@ export const SENDER_FILTERS: SenderFilter[] = [
   "suggested",
   "all",
   "can_unsubscribe",
+  "finish_on_web",
   "kept",
   "unsubscribed",
 ];
@@ -108,9 +109,8 @@ export function displayNameFor(name: string | null, address: string, domain: str
 }
 
 function senderStatus(row: SenderDbRow): SenderStatus {
-  if (row.unsubscribe_status === "done" || row.unsubscribe_status === "opened_in_browser") {
-    return "unsubscribed";
-  }
+  if (row.unsubscribe_status === "done") return "unsubscribed";
+  if (row.unsubscribe_status === "opened_in_browser") return "finish_on_web";
   return row.kept_at ? "kept" : "active";
 }
 
@@ -188,7 +188,7 @@ export function loadSenderRows(ctx: AppContext, options: LoadOptions = {}): Send
   for (const row of rows) {
     const total = row.total ?? 0;
     const status = senderStatus(row);
-    if (!one && total === 0 && status !== "unsubscribed") continue;
+    if (!one && total === 0 && status !== "unsubscribed" && status !== "finish_on_web") continue;
     if (scoped && !row.last_any_at) continue;
     const readCount = row.read_count ?? 0;
     result.push({
@@ -220,6 +220,8 @@ export function matchesFilter(row: SenderRow, filter: SenderFilter): boolean {
       return canUnsubscribe && row.recommendation === "unsubscribe";
     case "can_unsubscribe":
       return canUnsubscribe;
+    case "finish_on_web":
+      return row.status === "finish_on_web";
     case "kept":
       return row.status === "kept";
     case "unsubscribed":

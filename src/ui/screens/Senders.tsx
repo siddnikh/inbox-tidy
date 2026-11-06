@@ -8,6 +8,7 @@ import { PageHeader } from "../components/PageHeader.tsx";
 import { Segmented } from "../components/Segmented.tsx";
 import { SenderListRow, senderName } from "../components/Sender.tsx";
 import { plural } from "../format.ts";
+import { useConfirmUnsubscribe } from "../use-confirm-unsubscribe.ts";
 import { useLoad } from "../use-load.ts";
 
 const FILTERS: { value: SenderFilter; label: string }[] = [
@@ -134,6 +135,7 @@ export function Senders() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [selected, setSelected] = useState<Map<number, SenderRow>>(new Map());
   const [keepPending, setKeepPending] = useState<Set<number>>(new Set());
+  const confirming = useConfirmUnsubscribe();
 
   const params = new URLSearchParams({ filter, sort });
   if (query) params.set("q", query);
@@ -270,6 +272,11 @@ export function Senders() {
                 onUnsubscribe={() => app.openUnsubscribe([s])}
                 onToggleKeep={() => toggleKeep(s)}
                 onTrash={() => app.openTrash([s])}
+                confirmPending={confirming.pending.has(s.id)}
+                onConfirm={async () => {
+                  const updated = await confirming.confirm(s);
+                  if (updated) replaceRow(updated);
+                }}
               />
             ))}
           </ul>

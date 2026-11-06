@@ -8,7 +8,7 @@ export interface SummaryOptions {
   now?: number;
 }
 
-const LATEST_UNSUBSCRIBE = `a.kind = 'unsubscribe' AND a.status IN ('done', 'opened_in_browser') AND a.id = (
+const LATEST_UNSUBSCRIBE = `a.kind = 'unsubscribe' AND a.status = 'done' AND a.id = (
   SELECT MAX(b.id) FROM actions b WHERE b.sender_id = a.sender_id AND b.kind = 'unsubscribe'
 )`;
 
