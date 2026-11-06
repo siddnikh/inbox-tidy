@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { PROVIDER_PRESETS } from "../../src/core/mail/presets.ts";
 import type { HomeSummary, ScanStatus } from "../../src/shared/api.ts";
 import {
   approxCount,
   formatNumber,
   inboxOverview,
   methodBadge,
+  methodIcon,
   monogram,
   monthlyRate,
   plural,
@@ -12,6 +14,7 @@ import {
   readShare,
   relativeTime,
   scanFraction,
+  stepIcon,
 } from "../../src/ui/format.ts";
 
 describe("numbers", () => {
@@ -147,5 +150,27 @@ describe("scan fraction", () => {
     expect(scanFraction(base)).toBe(0.3);
     expect(scanFraction({ ...base, processed: 5000 })).toBe(1);
     expect(scanFraction({ ...base, total: 0 })).toBeNull();
+  });
+});
+
+describe("visual cues", () => {
+  test("every provider step gets a picture that matches its words", () => {
+    const icons = Object.fromEntries(
+      PROVIDER_PRESETS.map((p) => [p.id, p.steps.map((s) => stepIcon(s))]),
+    );
+    expect(icons).toEqual({
+      gmail: ["shield", "globe", "key", "clipboard"],
+      icloud: ["globe", "key", "key", "clipboard"],
+      yahoo: ["globe", "key", "key", "clipboard"],
+      rediffmail_pro: ["user", "field"],
+      other: ["server", "key"],
+    });
+  });
+
+  test("unsubscribe methods each have their own icon", () => {
+    expect(methodIcon("one_click")).toBe("bolt");
+    expect(methodIcon("mailto")).toBe("mail");
+    expect(methodIcon("web")).toBe("globe");
+    expect(methodIcon("none")).toBe("skip");
   });
 });

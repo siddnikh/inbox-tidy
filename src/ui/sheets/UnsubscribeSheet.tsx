@@ -1,7 +1,9 @@
 import { useState } from "preact/hooks";
 import type { ActionResult, SenderRow } from "../../shared/api.ts";
 import { useApp } from "../app-state.ts";
-import { Monogram, senderName } from "../components/Sender.tsx";
+import { Hint } from "../components/Feedback.tsx";
+import { Icon, IconTile } from "../components/Icon.tsx";
+import { MethodBadge, Monogram, senderName } from "../components/Sender.tsx";
 import { Sheet } from "../components/Sheet.tsx";
 import { methodPlan, plural } from "../format.ts";
 import { Progress, ResultList, runPerSender } from "./results.tsx";
@@ -120,23 +122,30 @@ export function UnsubscribeSheet({
               <span class="row-title">{senderName(s)}</span>
               <span class="row-subtitle">{methodPlan(s.unsubscribeMethod)}</span>
             </span>
+            <MethodBadge method={s.unsubscribeMethod} />
           </li>
         ))}
       </ul>
       {actionable.length === 0 && (
-        <p class="callout secondary">
+        <Hint icon="skip">
           None of these senders offer a way to unsubscribe. You can still move their emails to Trash
           from the Senders tab.
-        </p>
+        </Hint>
       )}
-      <label class="check-option">
+      <label class="check-option check-card">
         <input
           type="checkbox"
           checked={alsoTrash}
           disabled={busy || actionable.length === 0}
           onChange={(e) => setAlsoTrash(e.currentTarget.checked)}
         />
-        <span>Also move their emails to Trash (you can recover them from Trash)</span>
+        <IconTile name="trash" size="sm" tone="neutral" />
+        <span>
+          Also move their emails to Trash
+          <span class="caption secondary option-detail recoverable">
+            <Icon name="restore" size={12} /> You can recover them from Trash
+          </span>
+        </span>
       </label>
       {phase.name === "running" && (
         <Progress done={phase.done} total={actionable.length} label="Unsubscribing" />

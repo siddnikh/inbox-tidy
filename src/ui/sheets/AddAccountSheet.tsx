@@ -8,8 +8,10 @@ import type {
   ServerSettings,
 } from "../../shared/api.ts";
 import { ApiError, api } from "../api.ts";
-import { ErrorNotice } from "../components/Feedback.tsx";
+import { ErrorNotice, Hint } from "../components/Feedback.tsx";
+import { Icon, type IconName, IconTile } from "../components/Icon.tsx";
 import { Sheet } from "../components/Sheet.tsx";
+import { stepIcon } from "../format.ts";
 import { useLoad } from "../use-load.ts";
 
 type Step = "provider" | "password" | "form";
@@ -22,6 +24,77 @@ const PROVIDER_HINTS: Record<MailProviderId, string> = {
   rediffmail_pro: "Business accounts",
   other: "Any provider with IMAP",
 };
+
+const PROVIDER_ICONS: Record<MailProviderId, IconName> = {
+  gmail: "mail",
+  icloud: "mail",
+  yahoo: "mail",
+  rediffmail_pro: "user",
+  other: "server",
+};
+
+const STEP_NAMES = ["Choose", "Password", "Connect"];
+
+function SheetSteps({ current }: { current: number }) {
+  return (
+    <div class="sheet-steps">
+      <p class="caption secondary">
+        Step {current} of {STEP_NAMES.length}
+      </p>
+      <ol class="sheet-steps-track" aria-hidden="true">
+        {STEP_NAMES.map((name, i) => (
+          <li
+            key={name}
+            class={i + 1 < current ? "is-done" : i + 1 === current ? "is-current" : undefined}
+          >
+            {name}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function SettingsLink({ provider }: { provider: ProviderPreset }) {
+  if (!provider.appPasswordUrl) return null;
+  return (
+    <a
+      class="button button-link-out"
+      href={provider.appPasswordUrl}
+      target="_blank"
+      rel="noreferrer"
+    >
+      Open {provider.label} settings
+      <Icon name="external" size={14} />
+    </a>
+  );
+}
+
+function PasswordSteps({ provider }: { provider: ProviderPreset }) {
+  // The steps say "(button below)", so the link sits inside the step that mentions it.
+  const linkAt = provider.steps.findIndex((s) => /button below/i.test(s));
+  return (
+    <>
+      <ol class="visual-steps">
+        {provider.steps.map((step, i) => (
+          <li key={step} class="visual-step">
+            <span class="visual-step-marker">
+              <IconTile name={stepIcon(step)} />
+              <span class="step-badge" aria-hidden="true">
+                {i + 1}
+              </span>
+            </span>
+            <span class="visual-step-text">
+              <span class="body">{step}</span>
+              {i === linkAt && <SettingsLink provider={provider} />}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {linkAt < 0 && <SettingsLink provider={provider} />}
+    </>
+  );
+}
 
 function normalise(field: string): string {
   return field.toLowerCase().replace(/[^a-z]/g, "");
@@ -81,7 +154,10 @@ export function AddAccountSheet({
     const problems: Partial<Record<FieldKey, string>> = {};
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       problems.email = "Enter your full email address, like you@example.com.";
-    if (!password) problems.password = "Paste the app password you created.";
+    if (!password)
+      problems.password = provider?.appPasswordUrl
+        ? "Paste the app password you created."
+        : "Enter your password.";
     if (isOther) {
       if (!imap.host.trim()) problems.imapHost = "Enter the incoming mail server.";
       if (!Number.isInteger(Number(imap.port)) || Number(imap.port) <= 0)
@@ -129,7 +205,8 @@ export function AddAccountSheet({
   const fieldProblem = (key: FieldKey) =>
     invalid[key] ? (
       <span class="field-problem" id={`${key}-problem`}>
-        {invalid[key]}
+        <Icon name="alert" class="hint-icon" size={14} />
+        <span>{invalid[key]}</span>
       </span>
     ) : null;
 
@@ -198,7 +275,7 @@ export function AddAccountSheet({
   if (step === "provider") {
     body = (
       <>
-        <p class="caption secondary">Step 1 of 3</p>
+        <SheetSteps current={1} />
         <p class="body">Which email do you want to tidy?</p>
         {providers.data === undefined && providers.loading && (
           <div class="tile-grid" role="status" aria-label="Loading email providers">
@@ -225,6 +302,7 @@ export function AddAccountSheet({
                 onClick={() => choose(p)}
                 data-autofocus={i === 0 ? true : undefined}
               >
+                <IconTile name={PROVIDER_ICONS[p.id]} size="sm" />
                 <span class="tile-title">{p.label}</span>
                 <span class="caption secondary">{PROVIDER_HINTS[p.id]}</span>
               </button>
@@ -241,27 +319,27 @@ export function AddAccountSheet({
   } else if (step === "password" && provider) {
     body = (
       <>
-        <p class="caption secondary">Step 2 of 3</p>
-        <p class="body">
-          {provider.id === "other"
-            ? "You'll need your provider's mail server details."
-            : `${provider.label} needs a special password just for Inbox Tidy. Your normal password won't work, and this one can be removed any time.`}
-        </p>
-        <ol class="steps">
-          {provider.steps.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ol>
-        {provider.note && <p class="callout note">{provider.note}</p>}
-        {provider.appPasswordUrl && (
-          <a
-            class="button link-button"
-            href={provider.appPasswordUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open {provider.label} settings
-          </a>
+        <SheetSteps current={2} />
+        <div class="intro">
+          <IconTile
+            name={isOther ? "server" : provider.appPasswordUrl ? "key" : "shield"}
+            tone="brand"
+            size="lg"
+          />
+          <p class="body">
+            {isOther
+              ? "You'll need your provider's mail server details."
+              : provider.appPasswordUrl
+                ? `${provider.label} needs a special password just for Inbox Tidy. Your normal password won't work, and this one can be removed any time.`
+                : `${provider.label} needs one setting turned on before Inbox Tidy can read your inbox.`}
+          </p>
+        </div>
+        <PasswordSteps provider={provider} />
+        {provider.note && (
+          <p class="callout note">
+            <Icon name="info" class="hint-icon" />
+            <span>{provider.note}</span>
+          </p>
         )}
       </>
     );
@@ -276,14 +354,14 @@ export function AddAccountSheet({
           onClick={() => setStep("form")}
           data-autofocus
         >
-          {provider.id === "other" ? "Continue" : "I have my app password"}
+          {provider.appPasswordUrl ? "I have my app password" : "Continue"}
         </button>
       </>
     );
   } else {
     body = (
       <form id="add-account-form" ref={formRef} class="form" onSubmit={submit} noValidate>
-        <p class="caption secondary">Step 3 of 3</p>
+        <SheetSteps current={3} />
         {error && (
           <div id="connect-error">
             <ErrorNotice
@@ -309,7 +387,13 @@ export function AddAccountSheet({
             {fieldProblem("email")}
           </label>
           <label class="field">
-            <span class="field-label">{isOther ? "Password or app password" : "App password"}</span>
+            <span class="field-label">
+              {isOther
+                ? "Password or app password"
+                : provider?.appPasswordUrl
+                  ? "App password"
+                  : "Password"}
+            </span>
             <span class="password-wrap">
               <input
                 class="input"
@@ -329,7 +413,10 @@ export function AddAccountSheet({
                 {showPassword ? "Hide" : "Show"}
               </button>
             </span>
-            {fieldProblem("password")}
+            {fieldProblem("password") ??
+              (provider?.appPasswordUrl && (
+                <Hint icon="clipboard">Paste the password {provider.label} showed you.</Hint>
+              ))}
           </label>
           {isOther && (
             <>
@@ -354,9 +441,9 @@ export function AddAccountSheet({
             </>
           )}
         </fieldset>
-        <p class="caption secondary">
+        <Hint icon="lock">
           Your password is kept in your Mac's Keychain and only used to read your inbox.
-        </p>
+        </Hint>
       </form>
     );
     footer = (

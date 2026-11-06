@@ -7,8 +7,8 @@ import type {
 } from "../../shared/api.ts";
 import { ApiError, api } from "../api.ts";
 import { useApp } from "../app-state.ts";
-import { ErrorNotice } from "../components/Feedback.tsx";
-import { Icon } from "../components/Icon.tsx";
+import { ErrorNotice, Hint, InlineError } from "../components/Feedback.tsx";
+import { Icon, IconTile } from "../components/Icon.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
 import { useLoad } from "../use-load.ts";
 
@@ -97,17 +97,21 @@ function AiCheck() {
   return (
     <div class="setting-action">
       <button type="button" class="button" onClick={run} disabled={check.state === "running"}>
+        <Icon name="sparkles" size={14} />
         {check.state === "running" ? "Checking… this can take a moment" : "Test the AI helper"}
       </button>
       <div aria-live="polite">
         {check.state === "ok" && (
-          <p class="callout success">
-            {check.data.label} answered in {(check.data.durationMs / 1000).toFixed(1)} seconds. It's
-            ready to sort your senders.
+          <p class="hint callout success">
+            <Icon name="check" class="hint-icon" />
+            <span>
+              {check.data.label} answered in {(check.data.durationMs / 1000).toFixed(1)} seconds.
+              It's ready to sort your senders.
+            </span>
           </p>
         )}
         {check.state === "error" && (
-          <p class="callout danger">The AI helper didn't answer. {check.message}</p>
+          <InlineError announce={false}>The AI helper didn't answer. {check.message}</InlineError>
         )}
       </div>
     </div>
@@ -155,6 +159,7 @@ export function Settings() {
       <PageHeader title="Settings" />
       <section class="card settings-group" aria-labelledby="ai-heading">
         <div class="setting-heading">
+          <IconTile name="sparkles" tone="brand" />
           <h2 class="headline" id="ai-heading">
             AI helper
           </h2>
@@ -162,9 +167,11 @@ export function Settings() {
         </div>
         <p class="callout secondary">
           Inbox Tidy uses an AI helper on your Mac to sort senders and suggest which ones to
-          unsubscribe from. It only sees sender names and subject lines, never the emails
-          themselves.
+          unsubscribe from.
         </p>
+        <Hint icon="lock">
+          It only sees sender names and subject lines, never the emails themselves.
+        </Hint>
         <div class="radio-list">
           {AI_CHOICES.map((choice) => (
             <label class="check-option" key={choice.value}>
@@ -182,29 +189,33 @@ export function Settings() {
           ))}
         </div>
         {aiStatus.state === "error" && (
-          <p class="callout danger" role="alert">
-            Couldn't save your AI helper choice. {aiStatus.message}
-          </p>
+          <InlineError>Couldn't save your AI helper choice. {aiStatus.message}</InlineError>
         )}
         <div class="availability">
           {health.data === undefined && health.loading && (
             <span class="skeleton skeleton-text" style={{ width: "45%" }} />
           )}
           {health.data === undefined && health.error && (
-            <p class="callout danger">
+            <InlineError announce={false}>
               Couldn't check which AI helpers are installed. {health.error}{" "}
               <button type="button" class="button button-plain inline" onClick={health.retry}>
                 Try again
               </button>
-            </p>
+            </InlineError>
           )}
           {health.data && (
-            <ul class="plain-list callout">
+            <ul class="plain-list callout availability-list">
               {health.data.ai.providers.map((p) => (
-                <li key={p.id}>
-                  {p.label}:{" "}
-                  <span class={p.available ? "success" : "secondary"}>
-                    {p.available ? "installed" : "not found on this Mac"}
+                <li key={p.id} class="hint">
+                  <Icon
+                    name={p.available ? "check" : "skip"}
+                    class={`hint-icon ${p.available ? "success" : "secondary"}`}
+                  />
+                  <span>
+                    {p.label}:{" "}
+                    <span class={p.available ? "success" : "secondary"}>
+                      {p.available ? "installed" : "not found on this Mac"}
+                    </span>
                   </span>
                 </li>
               ))}
@@ -216,6 +227,7 @@ export function Settings() {
 
       <section class="card settings-group" aria-labelledby="lookback-heading">
         <div class="setting-heading">
+          <IconTile name="calendar" tone="brand" />
           <h2 class="headline" id="lookback-heading">
             How far back to look
           </h2>
@@ -235,11 +247,9 @@ export function Settings() {
             ))}
           </select>
         </label>
-        <p class="callout secondary">The next scan reads emails from this far back.</p>
+        <Hint icon="clock">The next scan reads emails from this far back.</Hint>
         {lookbackStatus.state === "error" && (
-          <p class="callout danger" role="alert">
-            Couldn't save how far back to look. {lookbackStatus.message}
-          </p>
+          <InlineError>Couldn't save how far back to look. {lookbackStatus.message}</InlineError>
         )}
       </section>
 
