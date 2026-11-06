@@ -71,7 +71,7 @@ Every `/api` request must (1) target exactly `127.0.0.1:<port>` or `localhost:<p
 ## Repository layout
 
 ```text
-shell/              native window source and Info.plist template
+shell/              native window source, Info.plist template, app icon (icon/*.svg → AppIcon.icns)
 src/core/           Bun core
   ai/               AI CLI bridge and PATH resolution
   db/               SQLite open and migrations
@@ -81,9 +81,10 @@ src/core/           Bun core
   routes/           HTTP route tables: system, accounts, insights, actions
 src/shared/api.ts   UI ↔ core contract (all request and response types)
 src/ui/             Preact UI (index.html, App.tsx, styles.css tokens)
-scripts/            build, install, dev, and readiness tooling
+scripts/            build, install, dev, icon (build-icon.ts), and readiness tooling
 tests/unit/         fast tests with in-memory DB, fake AI, memory secret store
 tests/integration/  tests against GreenMail (need `make infra-up`)
+assets/brand/       logo suite, favicons, and palette (README.md)
 ctx/                project knowledge
 .local/             ignored: dev data, QA helpers, screenshots
 dist/               ignored: build output
